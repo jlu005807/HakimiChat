@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式主色调 -->
+    <color name="colorPrimary">#BB86FC</color>
+    <color name="colorPrimaryDark">#3700B3</color>
+    <color name="colorAccent">#03DAC5</color>
+    
+    <!-- 背景颜色 -->
+    <color name="backgroundColor">#121212</color>
+    <color name="backgroundSecondary">#1E1E1E</color>
+    <color name="backgroundTertiary">#2D2D2D</color>
+    
+    <!-- 文字颜色 -->
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="textSecondary">#B3B3B3</color>
+    <color name="textTertiary">#808080</color>
+    
+    <!-- 消息气泡颜色 - 深色模式 -->
+    <color name="messageSentBackground">#1E88E5</color>
+    <color name="messageSentText">#FFFFFF</color>
+    <color name="messageReceivedBackground">#2D2D2D</color>
+    <color name="messageReceivedText">#FFFFFF</color>
+    <color name="messageReceivedBorder">#404040</color>
+    
+    <!-- 卡片和分隔线 -->
+    <color name="cardBackground">#1E1E1E</color>
+    <color name="dividerColor">#2D2D2D</color>
+    
+    <!-- 按钮颜色 -->
+    <color name="buttonPrimary">#BB86FC</color>
+    <color name="buttonSecondary">#03DAC5</color>
+    <color name="buttonDisabled">#404040</color>
+    
+    <!-- 状态颜色 -->
+    <color name="statusOnline">#4CAF50</color>
+    <color name="statusOffline">#F44336</color>
+    <color name="statusWarning">#FF9800</color>
+</resources>
