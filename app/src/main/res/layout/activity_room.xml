@@ -79,33 +79,51 @@
             android:id="@+id/etMessage"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:minHeight="48dp"
+            android:minHeight="40dp"
             android:layout_weight="1"
-            android:hint="输入消息（最多300字）..."
+            android:hint="输入消息（最多300字）"
             android:textColorHint="@color/textTertiary"
             android:textColor="@color/textPrimary"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
             android:background="@drawable/bg_edittext"
             android:maxLines="4"
             android:maxLength="300"
-            android:textSize="14sp"
-            android:inputType="textMultiLine|textCapSentences" />
+            android:textSize="15sp"
+            android:inputType="textMultiLine|textCapSentences"
+            android:gravity="center_vertical" />
 
         <Button
             android:id="@+id/btnSend"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
+            android:layout_width="62dp"
+            android:layout_height="40dp"
             android:text="发送"
             android:textSize="14sp"
             android:layout_marginStart="8dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:textColor="@android:color/white"
-            android:backgroundTint="@color/buttonPrimary" />
+            android:backgroundTint="@color/buttonPrimary"
+            android:visibility="gone"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp" />
+
+        <ImageButton
+            android:id="@+id/btnGame"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/ic_game"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="游戏"
+            android:scaleType="centerInside"
+            android:tint="@color/buttonPrimary"
+            android:visibility="visible"
+            android:padding="8dp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

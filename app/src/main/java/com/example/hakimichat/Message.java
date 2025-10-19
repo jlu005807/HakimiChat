@@ -13,6 +13,14 @@ public class Message implements Serializable {
     public static final int TYPE_MEMBER_LIST = 4;    // 成员列表
     public static final int TYPE_KICK = 5;           // 踢人消息
     public static final int TYPE_HISTORY = 6;        // 历史消息
+    public static final int TYPE_GAME_INVITE = 7;    // 游戏邀请
+    public static final int TYPE_GAME_JOIN = 8;      // 加入游戏
+    public static final int TYPE_GAME_MOVE = 9;      // 游戏移动/操作
+    public static final int TYPE_GAME_STATE = 10;    // 游戏状态同步
+    public static final int TYPE_GAME_END = 11;      // 游戏结束
+    public static final int TYPE_GAME_SPECTATE = 12; // 观战请求
+    public static final int TYPE_GAME_QUIT = 13;     // 退出游戏
+    public static final int TYPE_GAME_RESTART = 14;  // 再来一局
     
     private String sender;
     private String content;
@@ -23,6 +31,14 @@ public class Message implements Serializable {
     private String validatedNickname; // 验证后的昵称
     private boolean isHost;      // 是否是房主发送的消息
     private String targetNickname; // 踢人目标昵称（仅TYPE_KICK用）
+    
+    // 游戏相关字段
+    private String gameId;       // 游戏会话ID
+    private String gameType;     // 游戏类型 (如 "TicTacToe")
+    private String gameData;     // 游戏数据 (JSON格式)
+    private String invitedPlayer; // 被邀请的玩家
+    private java.util.List<String> players; // 游戏参与玩家列表
+    private java.util.List<String> spectators; // 观战者列表
 
     public Message(String sender, String content) {
         this.sender = sender;
@@ -153,5 +169,139 @@ public class Message implements Serializable {
 
     public void setTargetNickname(String targetNickname) {
         this.targetNickname = targetNickname;
+    }
+    
+    // 游戏相关的getter和setter
+    public String getGameId() {
+        return gameId;
+    }
+
+    public void setGameId(String gameId) {
+        this.gameId = gameId;
+    }
+
+    public String getGameType() {
+        return gameType;
+    }
+
+    public void setGameType(String gameType) {
+        this.gameType = gameType;
+    }
+
+    public String getGameData() {
+        return gameData;
+    }
+
+    public void setGameData(String gameData) {
+        this.gameData = gameData;
+    }
+
+    public String getInvitedPlayer() {
+        return invitedPlayer;
+    }
+
+    public void setInvitedPlayer(String invitedPlayer) {
+        this.invitedPlayer = invitedPlayer;
+    }
+
+    public java.util.List<String> getPlayers() {
+        return players;
+    }
+
+    public void setPlayers(java.util.List<String> players) {
+        this.players = players;
+    }
+
+    public java.util.List<String> getSpectators() {
+        return spectators;
+    }
+
+    public void setSpectators(java.util.List<String> spectators) {
+        this.spectators = spectators;
+    }
+    
+    /**
+     * 创建游戏邀请消息
+     */
+    public static Message createGameInviteMessage(String sender, String gameType, String gameId, String invitedPlayer) {
+        Message message = new Message(sender, "邀请你一起玩" + gameType);
+        message.messageType = TYPE_GAME_INVITE;
+        message.gameType = gameType;
+        message.gameId = gameId;
+        message.invitedPlayer = invitedPlayer;
+        return message;
+    }
+    
+    /**
+     * 创建加入游戏消息
+     */
+    public static Message createGameJoinMessage(String sender, String gameId) {
+        Message message = new Message(sender, "加入游戏");
+        message.messageType = TYPE_GAME_JOIN;
+        message.gameId = gameId;
+        return message;
+    }
+    
+    /**
+     * 创建游戏移动消息
+     */
+    public static Message createGameMoveMessage(String sender, String gameId, String moveData) {
+        Message message = new Message(sender, "游戏操作");
+        message.messageType = TYPE_GAME_MOVE;
+        message.gameId = gameId;
+        message.gameData = moveData;
+        return message;
+    }
+    
+    /**
+     * 创建游戏状态同步消息
+     */
+    public static Message createGameStateMessage(String gameId, String gameData) {
+        Message message = new Message("系统", "游戏状态");
+        message.messageType = TYPE_GAME_STATE;
+        message.gameId = gameId;
+        message.gameData = gameData;
+        return message;
+    }
+    
+    /**
+     * 创建游戏结束消息
+     */
+    public static Message createGameEndMessage(String gameId, String result) {
+        Message message = new Message("系统", result);
+        message.messageType = TYPE_GAME_END;
+        message.gameId = gameId;
+        message.gameData = result;
+        return message;
+    }
+    
+    /**
+     * 创建观战请求消息
+     */
+    public static Message createGameSpectateMessage(String sender, String gameId) {
+        Message message = new Message(sender, "请求观战");
+        message.messageType = TYPE_GAME_SPECTATE;
+        message.gameId = gameId;
+        return message;
+    }
+    
+    /**
+     * 创建退出游戏消息
+     */
+    public static Message createGameQuitMessage(String sender, String gameId) {
+        Message message = new Message(sender, "退出了游戏");
+        message.messageType = TYPE_GAME_QUIT;
+        message.gameId = gameId;
+        return message;
+    }
+    
+    /**
+     * 创建再来一局消息
+     */
+    public static Message createGameRestartMessage(String sender, String gameId) {
+        Message message = new Message(sender, "发起了再来一局");
+        message.messageType = TYPE_GAME_RESTART;
+        message.gameId = gameId;
+        return message;
     }
 }

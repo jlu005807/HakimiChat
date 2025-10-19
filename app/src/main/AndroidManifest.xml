@@ -35,6 +35,12 @@
             android:exported="false"
             android:label="设置"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".game.TicTacToeActivity"
+            android:exported="false"
+            android:label="井字棋"
+            android:parentActivityName=".RoomActivity"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

@@ -30,17 +30,22 @@ public class RoomActivity extends AppCompatActivity {
     private RecyclerView recyclerViewMessages;
     private EditText etMessage;
     private Button btnSend;
+    private android.widget.ImageButton btnGame;  // 游戏按钮
 
     private MessageAdapter messageAdapter;
     private ServerManager serverManager;
     private ClientManager clientManager;
     private Handler mainHandler;
+    private com.example.hakimichat.game.GameManager gameManager;  // 游戏管理器
 
     private boolean isHost;
     private String serverIp;
     private String username;
     private int connectedUserCount = 1; // 自己算一个
     private boolean hasBeenKicked = false; // 标记是否已被踢出
+    
+    // 游戏邀请信息缓存
+    private java.util.Map<String, String> gameTypeCache = new java.util.HashMap<>();  // gameId -> gameType
     
     private android.app.AlertDialog memberListDialog;
     private java.util.List<String> memberList = new java.util.ArrayList<>();
@@ -115,11 +120,15 @@ public class RoomActivity extends AppCompatActivity {
         recyclerViewMessages = findViewById(R.id.recyclerViewMessages);
         etMessage = findViewById(R.id.etMessage);
         btnSend = findViewById(R.id.btnSend);
+        btnGame = findViewById(R.id.btnGame);  // 初始化游戏按钮
         
         updateUserCount();
 
         // 点击在线人数弹出成员列表
         tvUserCount.setOnClickListener(v -> showMemberListDialog());
+        
+        // 点击游戏按钮显示游戏列表
+        btnGame.setOnClickListener(v -> showGameListDialog());
     }
 
     private void initData() {
@@ -134,6 +143,9 @@ public class RoomActivity extends AppCompatActivity {
         if (TextUtils.isEmpty(username)) {
             username = "";
         }
+        
+        // 初始化GameManager
+        gameManager = com.example.hakimichat.game.GameManager.getInstance();
     }
 
     private void setupRecyclerView() {
@@ -151,6 +163,42 @@ public class RoomActivity extends AppCompatActivity {
             sendMessage();
             return true;
         });
+        
+        // 监听输入框文本变化，切换发送按钮和游戏按钮的显示
+        etMessage.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+            
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+            
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                updateButtonVisibility();
+            }
+        });
+        
+        // 初始化按钮显示状态
+        updateButtonVisibility();
+    }
+    
+    /**
+     * 根据输入框内容更新按钮显示状态
+     * 有文字时显示发送按钮，无文字时显示游戏按钮
+     */
+    private void updateButtonVisibility() {
+        String text = etMessage.getText().toString().trim();
+        if (TextUtils.isEmpty(text)) {
+            // 无文字：显示游戏按钮，隐藏发送按钮
+            btnSend.setVisibility(android.view.View.GONE);
+            btnGame.setVisibility(android.view.View.VISIBLE);
+        } else {
+            // 有文字：显示发送按钮，隐藏游戏按钮
+            btnSend.setVisibility(android.view.View.VISIBLE);
+            btnGame.setVisibility(android.view.View.GONE);
+        }
     }
 
     private void startAsHost() {
@@ -188,6 +236,30 @@ public class RoomActivity extends AppCompatActivity {
                     } else if (message.getMessageType() == Message.TYPE_HISTORY) {
                         // 历史消息（房主不应该收到历史消息，但为了代码健壮性还是处理一下）
                         android.util.Log.d("RoomActivity", "收到历史消息: " + message.getContent());
+                        messageAdapter.addMessage(message);
+                        recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_INVITE) {
+                        // 游戏邀请消息
+                        handleGameInvite(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_JOIN) {
+                        // 加入游戏消息
+                        gameManager.handleGameJoin(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_MOVE) {
+                        // 游戏移动消息
+                        gameManager.handleGameMove(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_STATE) {
+                        // 游戏状态同步消息
+                        gameManager.handleGameState(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_END) {
+                        // 游戏结束消息
+                        gameManager.handleGameEnd(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_QUIT) {
+                        // 退出游戏消息
+                        gameManager.handleGameQuit(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_RESTART) {
+                        // 再来一局消息
+                        gameManager.handleGameRestart(message);
+                        // 在聊天区显示提示
                         messageAdapter.addMessage(message);
                         recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
                     } else {
@@ -246,6 +318,9 @@ public class RoomActivity extends AppCompatActivity {
         // 初始化房主的成员列表
         memberList.clear();
         memberList.add(username);
+        
+        // 初始化GameManager
+        gameManager.init(username, true, serverManager, null);
     }
 
     private void startAsClient() {
@@ -293,6 +368,29 @@ public class RoomActivity extends AppCompatActivity {
                         android.util.Log.d("RoomActivity", "收到历史消息: " + message.getContent());
                         messageAdapter.addMessage(message);
                         recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_INVITE) {
+                        // 游戏邀请消息
+                        handleGameInvite(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_JOIN) {
+                        // 加入游戏消息
+                        gameManager.handleGameJoin(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_MOVE) {
+                        // 游戏移动消息
+                        gameManager.handleGameMove(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_STATE) {
+                        // 游戏状态同步消息
+                        gameManager.handleGameState(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_END) {
+                        // 游戏结束消息
+                        gameManager.handleGameEnd(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_QUIT) {
+                        // 玩家退出游戏
+                        gameManager.handleGameQuit(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_RESTART) {
+                        // 重新开始游戏
+                        gameManager.handleGameRestart(message);
+                        messageAdapter.addMessage(message);
+                        recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
                     } else {
                         // 普通消息，添加到列表
                         messageAdapter.addMessage(message);
@@ -324,6 +422,9 @@ public class RoomActivity extends AppCompatActivity {
                     username = validatedNickname;
                     android.util.Log.d("RoomActivity", "昵称验证完成: " + validatedNickname);
                     showToast("你的昵称: " + validatedNickname);
+                    
+                    // 重新初始化GameManager，使用验证后的昵称
+                    gameManager.init(username, false, null, clientManager);
                 });
             }
 
@@ -668,5 +769,211 @@ public class RoomActivity extends AppCompatActivity {
 
     public static String getExtraUsername() {
         return EXTRA_USERNAME;
+    }
+    
+    // ==================== 游戏相关方法 ====================
+    
+    /**
+     * 显示游戏列表对话框
+     */
+    private void showGameListDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        android.view.View dialogView = getLayoutInflater().inflate(R.layout.dialog_game_list, null);
+        builder.setView(dialogView);
+        
+        RecyclerView recyclerViewGames = dialogView.findViewById(R.id.recyclerViewGames);
+        recyclerViewGames.setLayoutManager(new LinearLayoutManager(this));
+        
+        com.example.hakimichat.game.GameListAdapter adapter = 
+            new com.example.hakimichat.game.GameListAdapter(gameInfo -> {
+                // 点击游戏后，显示玩家选择对话框
+                showPlayerSelectionDialog(gameInfo);
+            });
+        recyclerViewGames.setAdapter(adapter);
+        
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+    
+    /**
+     * 显示玩家选择对话框（邀请谁一起玩）
+     */
+    private void showPlayerSelectionDialog(com.example.hakimichat.game.GameListAdapter.GameInfo gameInfo) {
+        // 获取房间成员列表（除了自己）
+        java.util.List<String> availablePlayers = new java.util.ArrayList<>(memberList);
+        availablePlayers.remove(username);
+        
+        if (availablePlayers.isEmpty()) {
+            showToast("房间里没有其他玩家");
+            return;
+        }
+        
+        // 添加"所有人"选项
+        String[] playerOptions = new String[availablePlayers.size() + 1];
+        playerOptions[0] = "所有人（谁先加入谁玩）";
+        for (int i = 0; i < availablePlayers.size(); i++) {
+            playerOptions[i + 1] = availablePlayers.get(i);
+        }
+        
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("邀请谁一起玩" + gameInfo.gameName + "?");
+        builder.setItems(playerOptions, (dialog, which) -> {
+            String invitedPlayer = which == 0 ? null : availablePlayers.get(which - 1);
+            createAndInviteGame(gameInfo.gameType, invitedPlayer);
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+    
+    /**
+     * 创建游戏并发送邀请
+     */
+    private void createAndInviteGame(String gameType, String invitedPlayer) {
+        com.example.hakimichat.game.Game game = gameManager.createGame(gameType);
+        if (game == null) {
+            showToast("创建游戏失败");
+            return;
+        }
+        
+        // 创建者自动加入游戏
+        game.addPlayer(username);
+        
+        String gameId = ((com.example.hakimichat.game.BaseGame) game).getGameId();
+        
+        // 发送游戏邀请
+        gameManager.sendGameInvite(gameType, gameId, invitedPlayer);
+        
+        // 显示系统消息
+        String inviteMsg = invitedPlayer == null ? 
+            "发起了" + game.getGameName() + "游戏，等待玩家加入" :
+            "邀请 " + invitedPlayer + " 一起玩" + game.getGameName();
+        Message systemMsg = new Message("系统", inviteMsg);
+        messageAdapter.addMessage(systemMsg);
+        
+        // 打开游戏界面
+        openGameActivity(gameId, false);
+    }
+    
+    /**
+     * 处理游戏邀请消息
+     */
+    private void handleGameInvite(Message message) {
+        String sender = message.getSender();
+        String gameType = message.getGameType();
+        String gameId = message.getGameId();
+        String invitedPlayer = message.getInvitedPlayer();
+        
+        // 缓存游戏类型，以便后续创建游戏实例
+        gameTypeCache.put(gameId, gameType);
+        
+        // 显示邀请消息
+        messageAdapter.addMessage(message);
+        
+        // 如果是邀请所有人，或者邀请的就是自己，显示加入对话框
+        if (invitedPlayer == null || invitedPlayer.equals(username)) {
+            showGameInviteDialog(sender, gameType, gameId, invitedPlayer);
+        }
+    }
+    
+    /**
+     * 显示游戏邀请对话框
+     */
+    private void showGameInviteDialog(String sender, String gameType, String gameId, String invitedPlayer) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        
+        // 根据gameType获取游戏名称
+        String gameName = "TicTacToe".equals(gameType) ? "井字棋" : gameType;
+        
+        builder.setTitle("游戏邀请");
+        builder.setMessage(sender + " 邀请你一起玩" + gameName + "，是否接受？");
+        builder.setPositiveButton("接受", (dialog, which) -> {
+            acceptGameInvite(gameId);
+        });
+        
+        // 只有当邀请所有人时（invitedPlayer为null），才显示观战选项
+        if (invitedPlayer == null) {
+            builder.setNegativeButton("观战", (dialog, which) -> {
+                spectateGame(gameId);
+            });
+        }
+        
+        builder.setNeutralButton("拒绝", null);
+        builder.show();
+    }
+    
+    /**
+     * 接受游戏邀请
+     */
+    private void acceptGameInvite(String gameId) {
+        // 获取或创建游戏实例
+        com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
+        if (game == null) {
+            // 从缓存中获取游戏类型
+            String gameType = gameTypeCache.get(gameId);
+            if (gameType == null) {
+                gameType = "TicTacToe";  // 默认类型
+            }
+            // 创建游戏实例（使用邀请消息中的 gameId）
+            game = gameManager.createGameWithId(gameType, gameId);
+            if (game == null) {
+                showToast("创建游戏失败");
+                return;
+            }
+        }
+        
+        // 本地先添加自己到游戏中
+        game.addPlayer(username);
+        
+        // 发送加入消息给其他人
+        gameManager.acceptGameInvite(gameId);
+        
+        // 显示系统消息
+        Message systemMsg = new Message("系统", "你加入了游戏");
+        messageAdapter.addMessage(systemMsg);
+        
+        // 打开游戏界面
+        openGameActivity(gameId, false);
+    }
+    
+    /**
+     * 观战游戏
+     */
+    private void spectateGame(String gameId) {
+        // 获取或创建游戏实例
+        com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
+        if (game == null) {
+            // 从缓存中获取游戏类型
+            String gameType = gameTypeCache.get(gameId);
+            if (gameType == null) {
+                gameType = "TicTacToe";  // 默认类型
+            }
+            // 创建游戏实例（使用邀请消息中的 gameId）
+            game = gameManager.createGameWithId(gameType, gameId);
+            if (game == null) {
+                showToast("创建游戏失败");
+                return;
+            }
+        }
+        
+        gameManager.addSpectator(gameId, username);
+        
+        // 显示系统消息
+        Message systemMsg = new Message("系统", "你正在观战");
+        messageAdapter.addMessage(systemMsg);
+        
+        // 以观战模式打开游戏界面
+        openGameActivity(gameId, true);
+    }
+    
+    /**
+     * 打开游戏Activity
+     */
+    private void openGameActivity(String gameId, boolean isSpectator) {
+        android.content.Intent intent = new android.content.Intent(this, 
+            com.example.hakimichat.game.TicTacToeActivity.class);
+        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_GAME_ID, gameId);
+        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_USERNAME, username);
+        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SPECTATOR, isSpectator);
+        startActivity(intent);
     }
 }
