@@ -1,15 +1,21 @@
 package com.example.hakimichat;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.graphics.Insets;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,6 +45,7 @@ public class RoomActivity extends AppCompatActivity {
     private android.app.AlertDialog memberListDialog;
     private java.util.List<String> memberList = new java.util.ArrayList<>();
     private MemberListAdapter memberListAdapter;
+    private android.widget.ListView memberListView; // 成员列表视图
     private android.widget.TextView tvMemberCountInDialog; // 对话框中的成员数量显示
 
     @Override
@@ -47,7 +54,17 @@ public class RoomActivity extends AppCompatActivity {
         ThemeManager.getInstance(this).initTheme();
         
         super.onCreate(savedInstanceState);
+        
+        // 设置窗口软键盘模式，确保Android 15正确处理
+        // 使用 adjustResize 确保输入框不被键盘遮挡
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        
         setContentView(R.layout.activity_room);
+        
+        // 为Android 11+处理窗口插入
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            setupWindowInsets();
+        }
 
         initViews();
         initData();
@@ -58,6 +75,36 @@ public class RoomActivity extends AppCompatActivity {
             startAsHost();
         } else {
             startAsClient();
+        }
+    }
+    
+    /**
+     * 设置窗口插入处理（Android 11+）
+     */
+    private void setupWindowInsets() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // 监听键盘显示/隐藏
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
+                Insets imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime());
+                
+                // 获取输入框布局
+                android.view.View inputLayout = findViewById(R.id.inputLayout);
+                if (inputLayout != null && imeInsets.bottom > 0) {
+                    // 键盘显示时，调整输入框位置
+                    ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+                    params.bottomMargin = imeInsets.bottom;
+                    inputLayout.setLayoutParams(params);
+                    inputLayout.requestLayout();
+                } else if (inputLayout != null && imeInsets.bottom == 0) {
+                    // 键盘隐藏时，恢复原始位置
+                    ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+                    params.bottomMargin = 0;
+                    inputLayout.setLayoutParams(params);
+                    inputLayout.requestLayout();
+                }
+                
+                return WindowInsetsCompat.CONSUMED;
+            });
         }
     }
 
@@ -127,6 +174,7 @@ public class RoomActivity extends AppCompatActivity {
                         android.util.Log.d("RoomActivity", "收到人数更新: " + connectedUserCount);
                     } else if (message.getMessageType() == Message.TYPE_MEMBER_LIST) {
                         // 成员列表消息
+                        android.util.Log.d("RoomActivity", "房主收到成员列表更新消息");
                         String[] members = message.getContent().split(",");
                         updateMemberList(members);
                     } else if (message.getMessageType() == Message.TYPE_KICK) {
@@ -137,6 +185,11 @@ public class RoomActivity extends AppCompatActivity {
                         if (targetNickname != null && targetNickname.equals(username)) {
                             android.util.Log.e("RoomActivity", "!!! 房主被踢出 !!! 这不应该发生");
                         }
+                    } else if (message.getMessageType() == Message.TYPE_HISTORY) {
+                        // 历史消息（房主不应该收到历史消息，但为了代码健壮性还是处理一下）
+                        android.util.Log.d("RoomActivity", "收到历史消息: " + message.getContent());
+                        messageAdapter.addMessage(message);
+                        recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
                     } else {
                         // 普通消息，添加到列表
                         messageAdapter.addMessage(message);
@@ -221,6 +274,7 @@ public class RoomActivity extends AppCompatActivity {
                         updateUserCount();
                         android.util.Log.d("RoomActivity", "客户端收到人数更新: " + connectedUserCount);
                     } else if (message.getMessageType() == Message.TYPE_MEMBER_LIST) {
+                        android.util.Log.d("RoomActivity", "客户端收到成员列表更新消息");
                         String[] members = message.getContent().split(",");
                         updateMemberList(members);
                     } else if (message.getMessageType() == Message.TYPE_KICK) {
@@ -234,6 +288,11 @@ public class RoomActivity extends AppCompatActivity {
                             btnSend.setEnabled(false);
                             etMessage.setText("");
                         }
+                    } else if (message.getMessageType() == Message.TYPE_HISTORY) {
+                        // 历史消息，添加到列表
+                        android.util.Log.d("RoomActivity", "收到历史消息: " + message.getContent());
+                        messageAdapter.addMessage(message);
+                        recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
                     } else {
                         // 普通消息，添加到列表
                         messageAdapter.addMessage(message);
@@ -374,16 +433,24 @@ public class RoomActivity extends AppCompatActivity {
                 if (!TextUtils.isEmpty(m)) memberList.add(m);
             }
         }
-        android.util.Log.d("RoomActivity", "更新成员列表: " + memberList.toString());
+        android.util.Log.d("RoomActivity", "更新成员列表: " + memberList.toString() + ", 适配器存在: " + (memberListAdapter != null) + ", 对话框显示: " + (memberListDialog != null && memberListDialog.isShowing()));
         
-        // 如果对话框正在显示，刷新列表和成员数量
+        // 直接更新UI（因为调用者已经在主线程中）
         if (memberListAdapter != null) {
+            android.util.Log.d("RoomActivity", "调用 notifyDataSetChanged()");
             memberListAdapter.notifyDataSetChanged();
+            
+            // 强制刷新 ListView
+            if (memberListView != null) {
+                android.util.Log.d("RoomActivity", "调用 ListView.invalidateViews()");
+                memberListView.invalidateViews();
+            }
         }
         
         // 更新对话框中的成员数量显示
         if (tvMemberCountInDialog != null) {
             tvMemberCountInDialog.setText("(" + memberList.size() + ")");
+            android.util.Log.d("RoomActivity", "对话框成员数量已更新: " + memberList.size());
         }
     }
 
@@ -394,16 +461,27 @@ public class RoomActivity extends AppCompatActivity {
             return;
         }
         
+        android.util.Log.d("RoomActivity", "打开成员列表对话框，当前成员: " + memberList.toString());
+        
         // 如果是房主，获取最新成员列表
         if (isHost && serverManager != null) {
             java.util.List<String> members = serverManager.getMemberList();
             memberList.clear();
             memberList.addAll(members);
+            android.util.Log.d("RoomActivity", "房主刷新成员列表: " + memberList.toString());
+        }
+        // 如果是客户端，请求最新成员列表
+        else if (!isHost && clientManager != null && clientManager.isConnected()) {
+            android.util.Log.d("RoomActivity", "客户端请求最新成员列表");
+            // 发送请求成员列表的消息
+            Message requestMsg = new Message("", "");
+            requestMsg.setMessageType(Message.TYPE_MEMBER_LIST);
+            clientManager.sendMessage(requestMsg);
         }
         
         android.view.LayoutInflater inflater = getLayoutInflater();
         android.view.View dialogView = inflater.inflate(R.layout.dialog_member_list, null);
-        android.widget.ListView listView = dialogView.findViewById(R.id.listViewMembers);
+        memberListView = dialogView.findViewById(R.id.listViewMembers);
         android.widget.Button btnClose = dialogView.findViewById(R.id.btnClose);
         tvMemberCountInDialog = dialogView.findViewById(R.id.tvMemberCount);
 
@@ -412,14 +490,13 @@ public class RoomActivity extends AppCompatActivity {
 
         // 使用自定义适配器
         memberListAdapter = new MemberListAdapter();
-        listView.setAdapter(memberListAdapter);
+        memberListView.setAdapter(memberListAdapter);
+        
+        android.util.Log.d("RoomActivity", "成员列表对话框已创建，适配器已设置");
         
         btnClose.setOnClickListener(v -> {
             if (memberListDialog != null) {
                 memberListDialog.dismiss();
-                memberListDialog = null;
-                memberListAdapter = null;
-                tvMemberCountInDialog = null;
             }
         });
         
@@ -429,8 +506,10 @@ public class RoomActivity extends AppCompatActivity {
                 .create();
         
         memberListDialog.setOnDismissListener(dialog -> {
+            android.util.Log.d("RoomActivity", "成员列表对话框已关闭，清理引用");
             memberListDialog = null;
             memberListAdapter = null;
+            memberListView = null;
             tvMemberCountInDialog = null;
         });
         
@@ -473,7 +552,9 @@ public class RoomActivity extends AppCompatActivity {
     private class MemberListAdapter extends android.widget.BaseAdapter {
         @Override
         public int getCount() {
-            return memberList.size();
+            int count = memberList.size();
+            android.util.Log.d("MemberListAdapter", "getCount() called, count=" + count);
+            return count;
         }
 
         @Override

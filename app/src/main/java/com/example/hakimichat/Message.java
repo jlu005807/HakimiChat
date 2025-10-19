@@ -12,6 +12,7 @@ public class Message implements Serializable {
     public static final int TYPE_NICKNAME_RESULT = 3;// 昵称验证结果
     public static final int TYPE_MEMBER_LIST = 4;    // 成员列表
     public static final int TYPE_KICK = 5;           // 踢人消息
+    public static final int TYPE_HISTORY = 6;        // 历史消息
     
     private String sender;
     private String content;

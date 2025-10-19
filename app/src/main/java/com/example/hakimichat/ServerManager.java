@@ -17,10 +17,12 @@ public class ServerManager {
 
     private static final String TAG = "ServerManager";
     private static final int SERVER_PORT = 8888;
+    private static final int MAX_HISTORY_SIZE = 30; // 最多保存30条历史消息
     
     private ServerSocket serverSocket;
     private CopyOnWriteArrayList<ClientHandler> clients;
     private CopyOnWriteArrayList<String> usedNicknames; // 已使用的昵称列表
+    private CopyOnWriteArrayList<Message> messageHistory; // 历史消息列表
     private ExecutorService executorService;
     private MessageListener messageListener;
     private boolean isRunning;
@@ -37,6 +39,7 @@ public class ServerManager {
         this.messageListener = listener;
         this.clients = new java.util.concurrent.CopyOnWriteArrayList<>();
         this.usedNicknames = new java.util.concurrent.CopyOnWriteArrayList<>();
+        this.messageHistory = new java.util.concurrent.CopyOnWriteArrayList<>();
         this.executorService = Executors.newCachedThreadPool();
         this.isRunning = false;
     }
@@ -145,8 +148,38 @@ public class ServerManager {
         List<String> members = getMemberList();
         String[] memberArray = members.toArray(new String[0]);
         Message memberListMsg = Message.createMemberListMessage(memberArray);
+        
+        // 广播给所有客户端
         broadcastMessage(memberListMsg);
-        Log.d(TAG, "广播成员列表: " + members.toString());
+        
+        // 同时通知房主端更新（因为broadcastMessage不会发送给房主自己）
+        if (messageListener != null) {
+            messageListener.onMessageReceived(memberListMsg);
+        }
+        
+        Log.d(TAG, "广播成员列表(包括房主): " + members.toString());
+    }
+    
+    /**
+     * 添加消息到历史记录
+     */
+    private void addToHistory(Message message) {
+        // 只保存普通消息到历史记录
+        if (message.getMessageType() == Message.TYPE_NORMAL) {
+            messageHistory.add(message);
+            // 保持历史记录在30条以内
+            while (messageHistory.size() > MAX_HISTORY_SIZE) {
+                messageHistory.remove(0);
+            }
+            Log.d(TAG, "消息已添加到历史记录，当前历史消息数: " + messageHistory.size());
+        }
+    }
+    
+    /**
+     * 获取历史消息列表
+     */
+    public List<Message> getMessageHistory() {
+        return new ArrayList<>(messageHistory);
     }
     
     /**
@@ -230,6 +263,10 @@ public class ServerManager {
 
     public void broadcastMessage(Message message) {
         Log.d(TAG, "Broadcasting message to " + clients.size() + " clients");
+        
+        // 将普通消息添加到历史记录
+        addToHistory(message);
+        
         executorService.execute(() -> {
             for (ClientHandler client : clients) {
                 try {
@@ -304,6 +341,9 @@ public class ServerManager {
                         sendMessage(resultMessage);
                         Log.d(TAG, "昵称验证完成: " + requestedNickname + " -> " + validatedNickname);
                         
+                        // 发送历史消息给新加入的用户
+                        sendHistoryToClient();
+                        
                         // 昵称验证成功后广播成员列表
                         broadcastMemberList();
                         continue;
@@ -326,6 +366,9 @@ public class ServerManager {
                     }
                     // 转发给所有其他客户端（不包括昵称相关消息）
                     if (message.getMessageType() == Message.TYPE_NORMAL) {
+                        // 将客户端的消息保存到历史记录
+                        addToHistory(message);
+                        
                         for (ClientHandler client : clients) {
                             if (client != this) {
                                 try {
@@ -356,6 +399,30 @@ public class ServerManager {
                 Log.e(TAG, "Error sending message to client", e);
                 close();
             }
+        }
+        
+        /**
+         * 发送历史消息给客户端
+         */
+        private void sendHistoryToClient() {
+            List<Message> history = getMessageHistory();
+            if (history.isEmpty()) {
+                Log.d(TAG, "没有历史消息需要发送");
+                return;
+            }
+            
+            Log.d(TAG, "发送 " + history.size() + " 条历史消息给新用户: " + clientNickname);
+            for (Message historyMsg : history) {
+                // 创建历史消息副本并标记为历史消息类型
+                Message historyCopy = new Message(historyMsg.getSender(), historyMsg.getContent());
+                historyCopy.setTimestamp(historyMsg.getTimestamp());
+                historyCopy.setHost(historyMsg.isHost());
+                historyCopy.setMessageType(Message.TYPE_HISTORY);
+                historyCopy.setSentByMe(false);
+                
+                sendMessage(historyCopy);
+            }
+            Log.d(TAG, "历史消息发送完成");
         }
 
         private boolean isClosed = false;

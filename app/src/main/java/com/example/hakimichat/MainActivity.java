@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.text.format.Formatter;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -47,6 +48,10 @@ public class MainActivity extends AppCompatActivity {
         ThemeManager.getInstance(this).initTheme();
         
         super.onCreate(savedInstanceState);
+        
+        // 设置窗口软键盘模式，确保输入框不被键盘遮挡
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        
         setContentView(R.layout.activity_main);
 
         initViews();
