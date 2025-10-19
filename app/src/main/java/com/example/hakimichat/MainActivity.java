@@ -320,7 +320,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String username = etUsername.getText().toString().trim();
-        // 不设置默认昵称，让 RoomActivity 通过 ServerManager 生成
+        
+        // 验证昵称长度
+        if (!username.isEmpty() && username.length() > AppConstants.MAX_NICKNAME_LENGTH) {
+            Toast.makeText(this, "昵称不能超过" + AppConstants.MAX_NICKNAME_LENGTH + "个字", Toast.LENGTH_SHORT).show();
+            return;
+        }
         
         android.util.Log.d("MainActivity", "创建房间 - IP: " + localIpAddress + ", 用户名: " + username);
         
@@ -379,8 +384,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String username = etUsername.getText().toString().trim();
-        // 如果昵称为空，不设置默认昵称，让服务器端分配
-        // 服务器会根据访客数量自动生成"哈基米1", "哈基米2"等
+        
+        // 验证昵称长度
+        if (!username.isEmpty() && username.length() > AppConstants.MAX_NICKNAME_LENGTH) {
+            Toast.makeText(this, "昵称不能超过" + AppConstants.MAX_NICKNAME_LENGTH + "个字", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         Intent intent = new Intent(this, RoomActivity.class);
         intent.putExtra(RoomActivity.getExtraIsHost(), false);

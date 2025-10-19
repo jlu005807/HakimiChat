@@ -131,11 +131,12 @@
             android:id="@+id/etUsername"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="输入你的昵称"
+            android:hint="输入你的昵称（最多10字）"
             android:textColorHint="@color/textTertiary"
             android:textColor="@color/textPrimary"
             android:inputType="text"
             android:maxLines="1"
+            android:maxLength="10"
             android:padding="12dp"
             android:layout_marginTop="12dp"
             android:background="@drawable/bg_edittext" />

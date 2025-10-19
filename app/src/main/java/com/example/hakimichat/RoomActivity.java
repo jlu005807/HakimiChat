@@ -364,6 +364,12 @@ public class RoomActivity extends AppCompatActivity {
             showToast("请输入消息");
             return;
         }
+        
+        // 检查消息长度
+        if (content.length() > AppConstants.MAX_MESSAGE_LENGTH) {
+            showToast("消息不能超过" + AppConstants.MAX_MESSAGE_LENGTH + "个字");
+            return;
+        }
 
         // 检查是否已被踢出
         if (hasBeenKicked) {

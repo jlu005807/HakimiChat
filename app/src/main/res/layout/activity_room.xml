@@ -81,7 +81,7 @@
             android:layout_height="wrap_content"
             android:minHeight="48dp"
             android:layout_weight="1"
-            android:hint="输入消息..."
+            android:hint="输入消息（最多300字）..."
             android:textColorHint="@color/textTertiary"
             android:textColor="@color/textPrimary"
             android:paddingStart="12dp"
@@ -90,6 +90,7 @@
             android:paddingBottom="8dp"
             android:background="@drawable/bg_edittext"
             android:maxLines="4"
+            android:maxLength="300"
             android:textSize="14sp"
             android:inputType="textMultiLine|textCapSentences" />
 

@@ -16,8 +16,8 @@ import java.util.concurrent.Executors;
 public class ServerManager {
 
     private static final String TAG = "ServerManager";
-    private static final int SERVER_PORT = 8888;
-    private static final int MAX_HISTORY_SIZE = 30; // 最多保存30条历史消息
+    private static final int SERVER_PORT = AppConstants.SERVER_PORT;
+    private static final int MAX_HISTORY_SIZE = AppConstants.MAX_HISTORY_SIZE; // 最多保存30条历史消息
     
     private ServerSocket serverSocket;
     private CopyOnWriteArrayList<ClientHandler> clients;
@@ -56,17 +56,25 @@ public class ServerManager {
             baseName = "哈基米";
             isDefaultNickname = true;
         } else {
+            // 验证昵称长度
+            String trimmedNickname = nickname.trim();
+            if (trimmedNickname.length() > AppConstants.MAX_NICKNAME_LENGTH) {
+                // 昵称超长，截断到最大长度
+                trimmedNickname = trimmedNickname.substring(0, AppConstants.MAX_NICKNAME_LENGTH);
+                Log.d(TAG, "昵称过长，已截断: " + nickname + " -> " + trimmedNickname);
+            }
+            
             // 如果用户指定了昵称并且不在已用列表中，则直接使用
-            if (!usedNicknames.contains(nickname)) {
-                usedNicknames.add(nickname);
-                Log.d(TAG, "昵称验证: " + nickname + " 可以直接使用");
-                return nickname;
+            if (!usedNicknames.contains(trimmedNickname)) {
+                usedNicknames.add(trimmedNickname);
+                Log.d(TAG, "昵称验证: " + trimmedNickname + " 可以直接使用");
+                return trimmedNickname;
             }
             
             // 如果用户指定了带数字的昵称，如"哈基米2"，先尝试提取基础昵称
-            baseName = nickname;
+            baseName = trimmedNickname;
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(.*?)(\\d+)$");
-            java.util.regex.Matcher matcher = pattern.matcher(nickname);
+            java.util.regex.Matcher matcher = pattern.matcher(trimmedNickname);
             
             if (matcher.matches()) {
                 // 如果找到了数字后缀，提取基础昵称

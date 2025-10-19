@@ -12,8 +12,8 @@ import java.util.concurrent.Executors;
 
 public class ClientManager {
     private static final String TAG = "ClientManager";
-    private static final int SERVER_PORT = 8888;
-    private static final int TIMEOUT = 5000;
+    private static final int SERVER_PORT = AppConstants.SERVER_PORT;
+    private static final int TIMEOUT = AppConstants.CONNECTION_TIMEOUT;
     
     private Socket socket;
     private ObjectOutputStream outputStream;
