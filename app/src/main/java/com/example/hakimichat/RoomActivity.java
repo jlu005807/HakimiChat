@@ -113,6 +113,8 @@ public class RoomActivity extends AppCompatActivity {
                     isKeyboardShowing = true;
                     isKeyboardExpected = false;  // 重置键盘预期标志
                     
+                    android.util.Log.d("RoomActivity", "键盘显示 - 高度: " + newKeyboardHeight + ", 已记录到keyboardHeight");
+                    
                     // 取消任何待处理的隐藏游戏面板任务
                     if (pendingHideGamePanelTask != null && mainHandler != null) {
                         mainHandler.removeCallbacks(pendingHideGamePanelTask);
@@ -130,57 +132,49 @@ public class RoomActivity extends AppCompatActivity {
                         isAnimating = false;
                     }
                     
-                    // 调整输入框位置(带动画)
+                    // 调整输入框位置
                     if (inputLayout != null) {
                         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
-                        int currentMargin = params.bottomMargin;
-                        
-                        // 如果当前margin和新键盘高度差异较大,使用动画;否则直接设置
-                        if (Math.abs(currentMargin - newKeyboardHeight) > 50) {
-                            // 使用动画平滑过渡
-                            android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(currentMargin, newKeyboardHeight);
-                            animator.setDuration(250);  // 键盘动画时长
-                            animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
-                            animator.addUpdateListener(animation -> {
-                                int animatedValue = (int) animation.getAnimatedValue();
-                                if (inputLayout != null) {
-                                    ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
-                                    p.bottomMargin = animatedValue;
-                                    inputLayout.setLayoutParams(p);
-                                }
-                            });
-                            animator.start();
-                        } else {
-                            // 直接设置,避免不必要的动画
-                            params.bottomMargin = newKeyboardHeight;
-                            inputLayout.setLayoutParams(params);
-                            inputLayout.requestLayout();
-                        }
+                        // 直接设置为键盘高度,确保输入框与键盘紧密相连
+                        params.bottomMargin = newKeyboardHeight;
+                        inputLayout.setLayoutParams(params);
+                        inputLayout.requestLayout();
                     }
                 } else {
                     // 键盘隐藏
                     boolean wasKeyboardShowing = isKeyboardShowing;
                     isKeyboardShowing = false;
                     
-                    // 只有在游戏面板没有显示且不在动画中时才恢复输入框位置
-                    // 并且要确保之前键盘是显示的(避免闪现)
-                    if (!isGamePanelShowing && !isAnimating && wasKeyboardShowing && inputLayout != null) {
-                        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
-                        int currentMargin = params.bottomMargin;
+                    // 键盘隐藏时的处理
+                    if (wasKeyboardShowing && inputLayout != null) {
+                        // 如果游戏面板显示中,保持底部边距不变
+                        if (isGamePanelShowing) {
+                            // 游戏面板已显示,不调整输入框位置
+                            return WindowInsetsCompat.CONSUMED;
+                        }
                         
-                        // 使用动画平滑过渡
-                        android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(currentMargin, 0);
-                        animator.setDuration(200);  // 键盘隐藏动画时长
-                        animator.setInterpolator(new android.view.animation.AccelerateInterpolator());
-                        animator.addUpdateListener(animation -> {
-                            int animatedValue = (int) animation.getAnimatedValue();
-                            if (inputLayout != null) {
-                                ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
-                                p.bottomMargin = animatedValue;
-                                inputLayout.setLayoutParams(p);
+                        // 如果游戏面板未显示,恢复输入框位置(底部边距为0)
+                        if (!isAnimating) {
+                            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+                            int currentMargin = params.bottomMargin;
+                            
+                            // 只有当当前边距大于0时才进行动画
+                            if (currentMargin > 0) {
+                                // 使用动画平滑过渡
+                                android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(currentMargin, 0);
+                                animator.setDuration(200);  // 键盘隐藏动画时长
+                                animator.setInterpolator(new android.view.animation.AccelerateInterpolator());
+                                animator.addUpdateListener(animation -> {
+                                    int animatedValue = (int) animation.getAnimatedValue();
+                                    if (inputLayout != null) {
+                                        ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+                                        p.bottomMargin = animatedValue;
+                                        inputLayout.setLayoutParams(p);
+                                    }
+                                });
+                                animator.start();
                             }
-                        });
-                        animator.start();
+                        }
                     }
                 }
                 
@@ -219,15 +213,22 @@ public class RoomActivity extends AppCompatActivity {
         
         // 点击游戏按钮切换游戏面板显示
         btnGame.setOnClickListener(v -> {
-            // 先移除输入框焦点并隐藏键盘
-            if (etMessage.hasFocus()) {
+            // 如果输入法正在显示，先隐藏输入法，然后显示游戏面板
+            if (isKeyboardShowing) {
                 etMessage.clearFocus();
                 hideKeyboard();
-                // 延迟一小段时间再切换面板,确保键盘完全隐藏
+                
+                // 延迟一小段时间再显示游戏面板,确保键盘完全隐藏
                 if (mainHandler != null) {
-                    mainHandler.postDelayed(() -> toggleGamePanel(), 100);
+                    // 保存当前的输入框底部边距，以便直接切换
+                    final int currentMargin = ((ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams()).bottomMargin;
+                    mainHandler.postDelayed(() -> {
+                        // 直接显示游戏面板，保持输入框位置不变
+                        showGamePanelDirectly(currentMargin);
+                    }, 150);
                 }
             } else {
+                // 如果输入法没有显示，直接切换游戏面板
                 toggleGamePanel();
             }
         });
@@ -363,8 +364,12 @@ public class RoomActivity extends AppCompatActivity {
                     }
                     isAnimating = false;
                     
-                    // 重要:保持inputLayout的bottomMargin,等待键盘显示后再调整
-                    // 不要在这里重置bottomMargin,因为键盘即将显示,会在setupWindowInsets中处理
+                    // 立即重置底部边距为0,让输入框回到底部
+                    // 键盘显示时会在setupWindowInsets中重新调整
+                    ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+                    params.bottomMargin = 0;
+                    inputLayout.setLayoutParams(params);
+                    inputLayout.requestLayout();
                 }
             } else {
                 isKeyboardExpected = false;
@@ -410,6 +415,60 @@ public class RoomActivity extends AppCompatActivity {
     }
     
     /**
+     * 直接显示游戏面板，保持输入框位置不变
+     * @param currentMargin 当前输入框底部边距
+     */
+    private void showGamePanelDirectly(int currentMargin) {
+        // 如果已经在显示或动画中，直接返回
+        if (isGamePanelShowing || isAnimating) {
+            return;
+        }
+        
+        // 取消待处理的任务
+        if (pendingHideGamePanelTask != null && mainHandler != null) {
+            mainHandler.removeCallbacks(pendingHideGamePanelTask);
+            pendingHideGamePanelTask = null;
+        }
+        
+        // 设置状态
+        isGamePanelShowing = true;
+        
+        // 计算面板高度：优先使用键盘高度，确保与输入法高度一致
+        int panelHeight;
+        if (keyboardHeight > 0) {
+            // 使用记录的键盘高度，确保游戏面板和输入法高度一致
+            panelHeight = keyboardHeight;
+            android.util.Log.d("RoomActivity", "使用已记录的键盘高度: " + keyboardHeight);
+        } else {
+            // 如果还没有记录键盘高度，使用当前的bottomMargin作为参考
+            if (currentMargin > 0) {
+                panelHeight = currentMargin;
+                // 同时记录这个高度为键盘高度
+                keyboardHeight = currentMargin;
+                android.util.Log.d("RoomActivity", "记录新的键盘高度(从margin): " + currentMargin);
+            } else {
+                android.util.DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+                int screenHeight = displayMetrics.heightPixels;
+                panelHeight = (int) (screenHeight * 0.38);
+                android.util.Log.d("RoomActivity", "使用默认高度: " + panelHeight);
+            }
+        }
+        
+        android.util.Log.d("RoomActivity", "showGamePanelDirectly - 面板高度: " + panelHeight + ", 当前margin: " + currentMargin + ", 键盘高度记录: " + keyboardHeight);
+        
+        // 设置游戏面板高度
+        ViewGroup.LayoutParams panelParams = gamePanel.getLayoutParams();
+        panelParams.height = panelHeight;
+        gamePanel.setLayoutParams(panelParams);
+        
+        // 直接显示游戏面板，使用panelHeight确保输入框位置与之前一致
+        gamePanel.setVisibility(android.view.View.VISIBLE);
+        ViewGroup.MarginLayoutParams inputParams = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
+        inputParams.bottomMargin = panelHeight;
+        inputLayout.setLayoutParams(inputParams);
+    }
+    
+    /**
      * 显示游戏面板(带动画)
      */
     private void showGamePanel() {
@@ -429,14 +488,19 @@ public class RoomActivity extends AppCompatActivity {
         // 隐藏键盘
         hideKeyboard();
         
-        // 计算面板高度:使用键盘高度,如果没有则使用屏幕高度的0.4倍
+        // 计算面板高度：优先使用键盘高度，如果没有则使用屏幕高度的0.4倍
         int panelHeight;
         if (keyboardHeight > 0) {
+            // 使用已记录的键盘高度，确保与输入法高度一致
             panelHeight = keyboardHeight;
+            android.util.Log.d("RoomActivity", "showGamePanel - 使用已记录的键盘高度: " + keyboardHeight);
         } else {
+            // 没有键盘高度记录时使用默认值
             android.util.DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
             int screenHeight = displayMetrics.heightPixels;
-            panelHeight = (int) (screenHeight * 0.38);
+            // 使用稍大的比例，因为一般键盘高度会占屏幕40%左右
+            panelHeight = (int) (screenHeight * 0.4);
+            android.util.Log.d("RoomActivity", "showGamePanel - 使用默认高度: " + panelHeight + " (屏幕高度: " + screenHeight + ")");
         }
         
         // 设置游戏面板高度
