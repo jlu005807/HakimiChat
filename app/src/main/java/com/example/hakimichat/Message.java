@@ -13,6 +13,8 @@ public class Message implements Serializable {
     public static final int TYPE_MEMBER_LIST = 4;    // 成员列表
     public static final int TYPE_KICK = 5;           // 踢人消息
     public static final int TYPE_HISTORY = 6;        // 历史消息
+
+    // 游戏相关消息类型常量
     public static final int TYPE_GAME_INVITE = 7;    // 游戏邀请
     public static final int TYPE_GAME_JOIN = 8;      // 加入游戏
     public static final int TYPE_GAME_MOVE = 9;      // 游戏移动/操作
