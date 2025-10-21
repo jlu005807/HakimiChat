@@ -21,18 +21,36 @@ import java.util.Locale;
 public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int VIEW_TYPE_SENT = 1;
     private static final int VIEW_TYPE_RECEIVED = 2;
+    private static final int VIEW_TYPE_GAME_INVITE = 3;
 
     private List<Message> messages;
     private SimpleDateFormat timeFormat;
+    private OnGameActionListener gameActionListener;
+    
+    // 游戏操作监听器接口
+    public interface OnGameActionListener {
+        void onJoinGame(String gameId, String gameType);
+        void onSpectateGame(String gameId, String gameType);
+    }
 
     public MessageAdapter() {
         this.messages = new ArrayList<>();
         this.timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
     }
+    
+    public void setGameActionListener(OnGameActionListener listener) {
+        this.gameActionListener = listener;
+    }
 
     @Override
     public int getItemViewType(int position) {
         Message message = messages.get(position);
+        
+        // 如果是游戏邀请消息，使用特殊的布局
+        if (message.getMessageType() == Message.TYPE_GAME_INVITE) {
+            return VIEW_TYPE_GAME_INVITE;
+        }
+        
         int viewType = message.isSentByMe() ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
         android.util.Log.d("MessageAdapter", "消息[" + position + "] isSentByMe=" + message.isSentByMe() + 
                 ", viewType=" + (viewType == VIEW_TYPE_SENT ? "SENT" : "RECEIVED") + 
@@ -47,6 +65,10 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_message_sent, parent, false);
             return new SentMessageViewHolder(view);
+        } else if (viewType == VIEW_TYPE_GAME_INVITE) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_message_game_invite, parent, false);
+            return new GameInviteViewHolder(view);
         } else {
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_message_received, parent, false);
@@ -62,6 +84,8 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             ((SentMessageViewHolder) holder).bind(message);
         } else if (holder instanceof ReceivedMessageViewHolder) {
             ((ReceivedMessageViewHolder) holder).bind(message);
+        } else if (holder instanceof GameInviteViewHolder) {
+            ((GameInviteViewHolder) holder).bind(message);
         }
     }
 
@@ -142,5 +166,104 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         ClipData clip = ClipData.newPlainText("消息内容", text);
         clipboard.setPrimaryClip(clip);
         Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show();
+    }
+    
+    /**
+     * 游戏邀请消息ViewHolder
+     */
+    class GameInviteViewHolder extends RecyclerView.ViewHolder {
+        android.widget.ImageView ivGameIcon;
+        TextView tvGameName, tvSender, tvGameStatus, tvTimestamp, tvDisabledHint;
+        android.widget.Button btnJoinGame, btnSpectate;
+        android.widget.LinearLayout llButtons;
+
+        GameInviteViewHolder(@NonNull View itemView) {
+            super(itemView);
+            ivGameIcon = itemView.findViewById(R.id.ivGameIcon);
+            tvGameName = itemView.findViewById(R.id.tvGameName);
+            tvSender = itemView.findViewById(R.id.tvSender);
+            tvGameStatus = itemView.findViewById(R.id.tvGameStatus);
+            tvTimestamp = itemView.findViewById(R.id.tvTimestamp);
+            tvDisabledHint = itemView.findViewById(R.id.tvDisabledHint);
+            btnJoinGame = itemView.findViewById(R.id.btnJoinGame);
+            btnSpectate = itemView.findViewById(R.id.btnSpectate);
+            llButtons = itemView.findViewById(R.id.llButtons);
+        }
+
+        void bind(Message message) {
+            // 设置游戏名称
+            String gameName = message.getGameName();
+            if (gameName == null || gameName.isEmpty()) {
+                gameName = "TicTacToe".equals(message.getGameType()) ? "井字棋" : message.getGameType();
+            }
+            tvGameName.setText(gameName);
+            
+            // 设置发起人信息
+            String senderText = message.getSender() + " 发起了游戏";
+            tvSender.setText(senderText);
+            
+            // 设置游戏状态
+            int currentPlayers = message.getCurrentPlayerCount();
+            int maxPlayers = message.getMaxPlayerCount();
+            boolean gameStarted = message.isGameStarted();
+            
+            if (maxPlayers > 0) {
+                if (gameStarted) {
+                    tvGameStatus.setText("游戏进行中");
+                } else {
+                    tvGameStatus.setText("等待玩家加入 (" + currentPlayers + "/" + maxPlayers + ")");
+                }
+            } else {
+                tvGameStatus.setText("等待玩家加入");
+            }
+            
+            // 设置时间戳
+            tvTimestamp.setText(timeFormat.format(new Date(message.getTimestamp())));
+            
+            // 根据游戏状态显示/隐藏按钮
+            if (gameStarted) {
+                // 游戏已开始，只能观战
+                llButtons.setVisibility(View.GONE);
+                tvDisabledHint.setVisibility(View.VISIBLE);
+                tvDisabledHint.setText("游戏已开始，只能观战");
+                
+                // 设置卡片点击事件，点击可观战
+                itemView.setOnClickListener(v -> {
+                    if (gameActionListener != null) {
+                        gameActionListener.onSpectateGame(message.getGameId(), message.getGameType());
+                    }
+                });
+            } else if (currentPlayers >= maxPlayers && maxPlayers > 0) {
+                // 游戏已满，只能观战
+                llButtons.setVisibility(View.GONE);
+                tvDisabledHint.setVisibility(View.VISIBLE);
+                tvDisabledHint.setText("游戏人数已满，只能观战");
+                
+                // 设置卡片点击事件，点击可观战
+                itemView.setOnClickListener(v -> {
+                    if (gameActionListener != null) {
+                        gameActionListener.onSpectateGame(message.getGameId(), message.getGameType());
+                    }
+                });
+            } else {
+                // 可以加入或观战
+                llButtons.setVisibility(View.VISIBLE);
+                tvDisabledHint.setVisibility(View.GONE);
+                
+                // 加入游戏按钮
+                btnJoinGame.setOnClickListener(v -> {
+                    if (gameActionListener != null) {
+                        gameActionListener.onJoinGame(message.getGameId(), message.getGameType());
+                    }
+                });
+                
+                // 观战按钮
+                btnSpectate.setOnClickListener(v -> {
+                    if (gameActionListener != null) {
+                        gameActionListener.onSpectateGame(message.getGameId(), message.getGameType());
+                    }
+                });
+            }
+        }
     }
 }

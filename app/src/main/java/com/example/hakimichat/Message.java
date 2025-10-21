@@ -41,6 +41,10 @@ public class Message implements Serializable {
     private String invitedPlayer; // 被邀请的玩家
     private java.util.List<String> players; // 游戏参与玩家列表
     private java.util.List<String> spectators; // 观战者列表
+    private boolean gameStarted; // 游戏是否已开始
+    private int currentPlayerCount; // 当前玩家数量
+    private int maxPlayerCount; // 最大玩家数量
+    private String gameName; // 游戏名称（用于显示）
 
     public Message(String sender, String content) {
         this.sender = sender;
@@ -222,6 +226,38 @@ public class Message implements Serializable {
         this.spectators = spectators;
     }
     
+    public boolean isGameStarted() {
+        return gameStarted;
+    }
+
+    public void setGameStarted(boolean gameStarted) {
+        this.gameStarted = gameStarted;
+    }
+
+    public int getCurrentPlayerCount() {
+        return currentPlayerCount;
+    }
+
+    public void setCurrentPlayerCount(int currentPlayerCount) {
+        this.currentPlayerCount = currentPlayerCount;
+    }
+
+    public int getMaxPlayerCount() {
+        return maxPlayerCount;
+    }
+
+    public void setMaxPlayerCount(int maxPlayerCount) {
+        this.maxPlayerCount = maxPlayerCount;
+    }
+
+    public String getGameName() {
+        return gameName;
+    }
+
+    public void setGameName(String gameName) {
+        this.gameName = gameName;
+    }
+    
     /**
      * 创建游戏邀请消息
      */
@@ -231,6 +267,33 @@ public class Message implements Serializable {
         message.gameType = gameType;
         message.gameId = gameId;
         message.invitedPlayer = invitedPlayer;
+        
+        // 设置游戏名称（可以根据gameType设置中文名称）
+        message.gameName = "TicTacToe".equals(gameType) ? "井字棋" : gameType;
+        
+        // 初始化游戏状态
+        message.gameStarted = false;
+        message.currentPlayerCount = 1; // 创建者已经加入
+        message.maxPlayerCount = 2; // 默认井字棋最多2人
+        
+        return message;
+    }
+    
+    /**
+     * 创建游戏邀请消息（带游戏状态）
+     */
+    public static Message createGameInviteMessageWithState(String sender, String gameType, String gameId, 
+                                                           String invitedPlayer, boolean gameStarted, 
+                                                           int currentPlayerCount, int maxPlayerCount, String gameName) {
+        Message message = new Message(sender, "邀请你一起玩" + gameName);
+        message.messageType = TYPE_GAME_INVITE;
+        message.gameType = gameType;
+        message.gameId = gameId;
+        message.invitedPlayer = invitedPlayer;
+        message.gameName = gameName;
+        message.gameStarted = gameStarted;
+        message.currentPlayerCount = currentPlayerCount;
+        message.maxPlayerCount = maxPlayerCount;
         return message;
     }
     

@@ -123,8 +123,30 @@ public class GameManager {
      * 发送游戏邀请
      */
     public void sendGameInvite(String gameType, String gameId, String invitedPlayer) {
-        Message message = Message.createGameInviteMessage(currentUsername, gameType, gameId, invitedPlayer);
-        sendMessage(message);
+        // 获取游戏实例以获取状态信息
+        Game game = activeGames.get(gameId);
+        if (game != null) {
+            boolean gameStarted = false;
+            if (game instanceof BaseGame) {
+                gameStarted = ((BaseGame) game).isGameStarted();
+            }
+            
+            Message message = Message.createGameInviteMessageWithState(
+                currentUsername, 
+                gameType, 
+                gameId, 
+                invitedPlayer,
+                gameStarted,
+                game.getPlayers().size(),
+                game.getMaxPlayers(),
+                game.getGameName()
+            );
+            sendMessage(message);
+        } else {
+            // 如果游戏实例不存在，使用默认方法
+            Message message = Message.createGameInviteMessage(currentUsername, gameType, gameId, invitedPlayer);
+            sendMessage(message);
+        }
     }
     
     /**

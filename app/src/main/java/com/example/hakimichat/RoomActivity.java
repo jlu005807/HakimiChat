@@ -314,6 +314,20 @@ public class RoomActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         messageAdapter = new MessageAdapter();
+        
+        // 设置游戏操作监听器
+        messageAdapter.setGameActionListener(new MessageAdapter.OnGameActionListener() {
+            @Override
+            public void onJoinGame(String gameId, String gameType) {
+                handleJoinGameFromMessage(gameId, gameType);
+            }
+
+            @Override
+            public void onSpectateGame(String gameId, String gameType) {
+                handleSpectateGameFromMessage(gameId, gameType);
+            }
+        });
+        
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
         recyclerViewMessages.setLayoutManager(layoutManager);
@@ -461,11 +475,10 @@ public class RoomActivity extends AppCompatActivity {
         panelParams.height = panelHeight;
         gamePanel.setLayoutParams(panelParams);
         
-        // 直接显示游戏面板，使用panelHeight确保输入框位置与之前一致
+        // 直接显示游戏面板，保持输入框位置不变
         gamePanel.setVisibility(android.view.View.VISIBLE);
-        ViewGroup.MarginLayoutParams inputParams = (ViewGroup.MarginLayoutParams) inputLayout.getLayoutParams();
-        inputParams.bottomMargin = panelHeight;
-        inputLayout.setLayoutParams(inputParams);
+        // 不修改 inputParams.bottomMargin，让输入框保持在当前位置
+        android.util.Log.d("RoomActivity", "游戏面板直接显示，输入框位置保持不变: " + currentMargin);
     }
     
     /**
@@ -516,10 +529,10 @@ public class RoomActivity extends AppCompatActivity {
         boolean isReplacingKeyboard = Math.abs(currentMargin - panelHeight) < 100;
         
         if (isReplacingKeyboard) {
-            // 键盘→游戏面板:直接显示,不要动画
+            // 键盘→游戏面板:直接显示,不要动画,保持输入框位置不动
             gamePanel.setVisibility(android.view.View.VISIBLE);
-            currentParams.bottomMargin = panelHeight;
-            inputLayout.setLayoutParams(currentParams);
+            // 不修改 currentParams.bottomMargin,保持输入框位置不变
+            android.util.Log.d("RoomActivity", "键盘→游戏面板切换，保持输入框位置: " + currentMargin);
         } else {
             // 无键盘→游戏面板:使用动画
             isAnimating = true;
@@ -1319,15 +1332,8 @@ public class RoomActivity extends AppCompatActivity {
         
         String gameId = ((com.example.hakimichat.game.BaseGame) game).getGameId();
         
-        // 发送游戏邀请
+        // 发送游戏邀请（邀请消息本身会显示在消息列表中）
         gameManager.sendGameInvite(gameType, gameId, invitedPlayer);
-        
-        // 显示系统消息
-        String inviteMsg = invitedPlayer == null ? 
-            "发起了" + game.getGameName() + "游戏，等待玩家加入" :
-            "邀请 " + invitedPlayer + " 一起玩" + game.getGameName();
-        Message systemMsg = new Message("系统", inviteMsg);
-        messageAdapter.addMessage(systemMsg);
         
         // 打开游戏界面
         openGameActivity(gameId, false);
@@ -1345,10 +1351,10 @@ public class RoomActivity extends AppCompatActivity {
         // 缓存游戏类型，以便后续创建游戏实例
         gameTypeCache.put(gameId, gameType);
         
-        // 显示邀请消息
+        // 直接显示游戏邀请卡片消息（不再显示额外的系统消息）
         messageAdapter.addMessage(message);
         
-        // 如果是邀请所有人，或者邀请的就是自己，显示加入对话框
+        // 如果是邀请所有人，或者邀请的就是自己，同时弹出对话框
         if (invitedPlayer == null || invitedPlayer.equals(username)) {
             showGameInviteDialog(sender, gameType, gameId, invitedPlayer);
         }
@@ -1454,5 +1460,75 @@ public class RoomActivity extends AppCompatActivity {
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_USERNAME, username);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SPECTATOR, isSpectator);
         startActivity(intent);
+    }
+    
+    /**
+     * 从消息中点击加入游戏
+     */
+    private void handleJoinGameFromMessage(String gameId, String gameType) {
+        // 获取或创建游戏实例
+        com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
+        if (game == null) {
+            // 创建游戏实例（使用邀请消息中的 gameId）
+            game = gameManager.createGameWithId(gameType, gameId);
+            if (game == null) {
+                showToast("创建游戏失败");
+                return;
+            }
+        }
+        
+        // 检查游戏是否已满
+        if (game.getPlayers().size() >= game.getMaxPlayers()) {
+            showToast("游戏人数已满，无法加入");
+            return;
+        }
+        
+        // 检查游戏是否已开始
+        if (game.isGameOver() || (game instanceof com.example.hakimichat.game.BaseGame && 
+            ((com.example.hakimichat.game.BaseGame)game).isGameStarted())) {
+            showToast("游戏已开始，无法加入");
+            return;
+        }
+        
+        // 本地先添加自己到游戏中
+        if (!game.addPlayer(username)) {
+            showToast("加入游戏失败");
+            return;
+        }
+        
+        // 发送加入消息给其他人
+        gameManager.acceptGameInvite(gameId);
+        
+        // 显示系统消息
+        Message systemMsg = new Message("系统", "你加入了游戏");
+        messageAdapter.addMessage(systemMsg);
+        
+        // 打开游戏界面
+        openGameActivity(gameId, false);
+    }
+    
+    /**
+     * 从消息中点击观战游戏
+     */
+    private void handleSpectateGameFromMessage(String gameId, String gameType) {
+        // 获取或创建游戏实例
+        com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
+        if (game == null) {
+            // 创建游戏实例（使用邀请消息中的 gameId）
+            game = gameManager.createGameWithId(gameType, gameId);
+            if (game == null) {
+                showToast("创建游戏失败");
+                return;
+            }
+        }
+        
+        gameManager.addSpectator(gameId, username);
+        
+        // 显示系统消息
+        Message systemMsg = new Message("系统", "你正在观战");
+        messageAdapter.addMessage(systemMsg);
+        
+        // 以观战模式打开游戏界面
+        openGameActivity(gameId, true);
     }
 }

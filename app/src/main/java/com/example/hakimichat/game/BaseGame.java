@@ -84,6 +84,13 @@ public abstract class BaseGame implements Game {
         return isGameOver;
     }
     
+    /**
+     * 检查游戏是否已开始
+     */
+    public boolean isGameStarted() {
+        return isGameStarted;
+    }
+    
     @Override
     public String getGameResult() {
         return gameResult;

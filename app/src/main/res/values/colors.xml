@@ -27,6 +27,7 @@
     
     <!-- 卡片和分隔线 -->
     <color name="cardBackground">#FFFFFF</color>
+    <color name="divider">#E0E0E0</color>
     <color name="dividerColor">#E0E0E0</color>
     
     <!-- 按钮颜色 -->
