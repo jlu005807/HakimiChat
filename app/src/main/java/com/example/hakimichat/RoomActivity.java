@@ -374,10 +374,10 @@ public class RoomActivity extends AppCompatActivity {
         gameManager = com.example.hakimichat.game.GameManager.getInstance();
         
         // 设置游戏卡片更新监听器
-        gameManager.setGameCardUpdateListener((gameId, currentPlayers, maxPlayers, gameStarted) -> {
+        gameManager.setGameCardUpdateListener((gameId, currentPlayers, maxPlayers, gameStarted, gameEnded) -> {
             mainHandler.post(() -> {
                 if (messageAdapter != null) {
-                    messageAdapter.updateGameInviteCard(gameId, currentPlayers, maxPlayers, gameStarted);
+                    messageAdapter.updateGameInviteCard(gameId, currentPlayers, maxPlayers, gameStarted, gameEnded);
                 }
             });
         });
@@ -1518,13 +1518,28 @@ public class RoomActivity extends AppCompatActivity {
     /**
      * 打开游戏Activity
      */
+    private static final int REQUEST_CODE_GAME = 1001;
+    
     private void openGameActivity(String gameId, boolean isSpectator) {
         android.content.Intent intent = new android.content.Intent(this, 
             com.example.hakimichat.game.TicTacToeActivity.class);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_GAME_ID, gameId);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_USERNAME, username);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SPECTATOR, isSpectator);
-        startActivity(intent);
+        startActivityForResult(intent, REQUEST_CODE_GAME);
+    }
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_GAME) {
+            // 从游戏Activity返回，滚动到底部
+            if (messageAdapter != null && messageAdapter.getItemCount() > 0) {
+                recyclerViewMessages.post(() -> 
+                    recyclerViewMessages.smoothScrollToPosition(messageAdapter.getItemCount() - 1)
+                );
+            }
+        }
     }
     
     /**
@@ -1588,6 +1603,14 @@ public class RoomActivity extends AppCompatActivity {
         }
         
         gameManager.addSpectator(gameId, username);
+        
+        // 发送观战消息通知其他人
+        Message spectateMsg = Message.createGameSpectateMessage(username, gameId);
+        if (isHost && serverManager != null) {
+            serverManager.broadcastMessage(spectateMsg);
+        } else if (clientManager != null) {
+            clientManager.sendMessage(spectateMsg);
+        }
         
         // 显示系统消息
         Message systemMsg = new Message("系统", "你正在观战");

@@ -35,7 +35,7 @@ public class GameManager {
      * 游戏卡片更新监听器接口
      */
     public interface GameCardUpdateListener {
-        void onGameCardUpdate(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted);
+        void onGameCardUpdate(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted, boolean gameEnded);
     }
     
     private GameCardUpdateListener gameCardUpdateListener;
@@ -143,14 +143,17 @@ public class GameManager {
             Game game = activeGames.get(gameId);
             if (game != null) {
                 boolean gameStarted = false;
+                boolean gameEnded = false;
                 if (game instanceof BaseGame) {
                     gameStarted = ((BaseGame) game).isGameStarted();
+                    gameEnded = ((BaseGame) game).isGameOver() && game.getPlayers().isEmpty();
                 }
                 gameCardUpdateListener.onGameCardUpdate(
                     gameId, 
                     game.getPlayers().size(), 
                     game.getMaxPlayers(),
-                    gameStarted
+                    gameStarted,
+                    gameEnded
                 );
             }
         }
@@ -295,6 +298,12 @@ public class GameManager {
             JSONObject gameState = new JSONObject(message.getGameData());
             Game game = activeGames.get(gameId);
             
+            // 如果本地没有游戏实例，创建一个（用于更新卡片）
+            if (game == null) {
+                String gameType = gameState.optString("gameType", "TicTacToe");
+                game = createGameWithId(gameType, gameId);
+            }
+            
             if (game != null) {
                 game.setGameState(gameState);
                 
@@ -389,130 +398,120 @@ public class GameManager {
      * 退出游戏
      */
     public void quitGame(String gameId, String username) {
-        Game game = activeGames.get(gameId);
-        if (game != null) {
-            // 发送退出消息
-            Message quitMessage = Message.createGameQuitMessage(username, gameId);
-            sendMessage(quitMessage);
-            
-            // 从游戏中移除自己
-            game.removePlayer(username);
-            
-            // 检查是否还有玩家
-            if (game.getPlayers().isEmpty()) {
-                // 没有玩家了，移除游戏
-                removeGame(gameId);
-            }
-        }
+        // 创建并发送退出消息
+        Message quitMessage = Message.createGameQuitMessage(username, gameId);
+        sendMessage(quitMessage);
+        
+        // 立即在本地也处理这个消息（因为broadcastMessage不会发送给发送者自己）
+        handleGameQuit(quitMessage);
     }
     
     /**
-     * 处理退出游戏消息
+     * 处理退出游戏消息（统一处理本地和远程的退出）
      */
     public void handleGameQuit(Message message) {
         String gameId = message.getGameId();
         String quitter = message.getSender();
         
         Game game = activeGames.get(gameId);
-        if (game != null) {
-            boolean wasGameOver = game.isGameOver();
-            boolean wasGameStarted = false;
-            if (game instanceof BaseGame) {
-                wasGameStarted = ((BaseGame) game).isGameStarted();
-            }
+        if (game == null) {
+            return;
+        }
+        
+        boolean wasGameOver = game.isGameOver();
+        boolean wasGameStarted = false;
+        if (game instanceof BaseGame) {
+            wasGameStarted = ((BaseGame) game).isGameStarted();
+        }
+        
+        // 检查退出者是玩家还是观战者
+        boolean isPlayer = game.getPlayers().contains(quitter);
+        boolean isSpectator = game.getSpectators().contains(quitter);
+        
+        // 检查是否是发起者（第一个玩家）退出
+        boolean isCreator = isPlayer && game.getPlayers().size() > 0 && 
+                           game.getPlayers().get(0).equals(quitter);
+        
+        if (isPlayer) {
+            // 玩家退出
+            game.removePlayer(quitter);
             
-            // 检查退出者是玩家还是观战者
-            boolean isPlayer = game.getPlayers().contains(quitter);
-            boolean isSpectator = game.getSpectators().contains(quitter);
-            
-            // 检查是否是发起者（第一个玩家）退出
-            boolean isCreator = isPlayer && game.getPlayers().size() > 0 && 
-                               game.getPlayers().get(0).equals(quitter);
-            
-            if (isPlayer) {
-                // 玩家退出
-                game.removePlayer(quitter);
-                
-                if (isCreator) {
-                    // 发起者退出，结束游戏并通知所有人
-                    if (game instanceof BaseGame) {
-                        ((BaseGame) game).isGameOver = true;
-                        ((BaseGame) game).gameResult = "游戏已结束（发起者退出）";
-                    }
-                    
-                    // 通知所有监听器游戏结束（这会让在游戏界面的人看到结束消息）
-                    GameStateListener listener = gameStateListeners.get(gameId);
-                    if (listener != null) {
-                        listener.onGameEnded(gameId, "游戏已结束（发起者退出）");
-                    }
-                    
-                    // 广播游戏结束状态给所有人
-                    Message endMessage = Message.createGameEndMessage(gameId, "游戏已结束（发起者退出）");
-                    sendMessage(endMessage);
-                    
-                    // 通知游戏卡片更新为已结束状态
-                    if (gameCardUpdateListener != null) {
-                        gameCardUpdateListener.onGameCardUpdate(gameId, 0, game.getMaxPlayers(), false);
-                    }
-                    
-                    // 移除游戏
-                    removeGame(gameId);
-                } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 1) {
-                    // 非发起者退出，游戏已开始但未结束
-                    // 重置游戏让发起者可以继续等待其他人，而不是直接结束
-                    String winner = game.getPlayers().get(0);
-                    
-                    // 重置游戏状态
-                    game.reset();
-                    
-                    // 通知监听器游戏已重置，并显示提示信息
-                    GameStateListener listener = gameStateListeners.get(gameId);
-                    if (listener != null) {
-                        // 先通知对方已退出
-                        listener.onGameEnded(gameId, quitter + " 已退出，等待新玩家加入");
-                        // 然后更新游戏状态到等待状态
-                        listener.onGameStateChanged(gameId, game.getGameState());
-                    }
-                    
-                    // 通知游戏卡片更新
-                    notifyGameCardUpdate(gameId);
-                    
-                    // 广播游戏状态
-                    broadcastGameState(gameId);
-                } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 0) {
-                    // 所有玩家都退出了，移除游戏
-                    removeGame(gameId);
-                } else if (wasGameStarted && game.getPlayers().size() == 1) {
-                    // 游戏已开始，有玩家退出，重置游戏让发起者可以继续等待其他人
-                    game.reset();
-                    
-                    // 通知监听器游戏已重置
-                    GameStateListener listener = gameStateListeners.get(gameId);
-                    if (listener != null) {
-                        listener.onGameStateChanged(gameId, game.getGameState());
-                    }
-                    
-                    // 广播游戏状态
-                    broadcastGameState(gameId);
-                } else if (wasGameOver && game.getPlayers().size() >= 1) {
-                    // 游戏已结束，玩家退出，通知剩余玩家隐藏"再来一局"按钮
-                    GameStateListener listener = gameStateListeners.get(gameId);
-                    if (listener != null) {
-                        // 使用特殊的结果字符串来标识这是游戏结束后的退出
-                        listener.onGameEnded(gameId, quitter + " 已离开游戏");
-                    }
-                    
-                    // 广播游戏状态
-                    broadcastGameState(gameId);
-                } else {
-                    // 其他情况，广播游戏状态
-                    broadcastGameState(gameId);
+            if (isCreator) {
+                // 发起者退出，结束游戏并通知所有人
+                if (game instanceof BaseGame) {
+                    ((BaseGame) game).isGameOver = true;
+                    ((BaseGame) game).gameResult = "游戏已结束（发起者退出）";
                 }
-            } else if (isSpectator) {
-                // 观战者退出，只需移除并更新状态
-                game.removeSpectator(quitter);
+                
+                // 通知本地监听器（如果在游戏界面的人看到结束消息）
+                GameStateListener listener = gameStateListeners.get(gameId);
+                if (listener != null) {
+                    listener.onGameEnded(gameId, "游戏已结束（发起者退出）");
+                }
+                
+                // 广播游戏结束消息给所有人
+                Message endMessage = Message.createGameEndMessage(gameId, "游戏已结束（发起者退出）");
+                sendMessage(endMessage);
+                
+                // 广播游戏状态，让所有人（包括没进入游戏的人）都能更新卡片
+                broadcastGameState(gameId);
+                
+                // 通知本地游戏卡片更新为已结束状态
+                if (gameCardUpdateListener != null) {
+                    gameCardUpdateListener.onGameCardUpdate(gameId, 0, game.getMaxPlayers(), false, true);
+                }
+                
+                // 保留游戏作为历史记录，不移除
+                // removeGame(gameId);
+            } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 1) {
+                // 非发起者退出，游戏已开始但未结束
+                // 重置游戏让发起者可以继续等待其他人
+                game.reset();
+                
+                // 通知监听器游戏已重置
+                GameStateListener listener = gameStateListeners.get(gameId);
+                if (listener != null) {
+                    listener.onGameEnded(gameId, quitter + " 已退出，等待新玩家加入");
+                    listener.onGameStateChanged(gameId, game.getGameState());
+                }
+                
+                // 通知游戏卡片更新
+                notifyGameCardUpdate(gameId);
+                
+                // 广播游戏状态
+                broadcastGameState(gameId);
+            } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 0) {
+                // 所有玩家都退出了，移除游戏
+                removeGame(gameId);
+            } else if (wasGameStarted && game.getPlayers().size() == 1) {
+                // 游戏已开始，有玩家退出，重置游戏
+                game.reset();
+                
+                // 通知监听器
+                GameStateListener listener = gameStateListeners.get(gameId);
+                if (listener != null) {
+                    listener.onGameStateChanged(gameId, game.getGameState());
+                }
+                
+                // 广播游戏状态
+                broadcastGameState(gameId);
+            } else if (wasGameOver && game.getPlayers().size() >= 1) {
+                // 游戏已结束，玩家退出，通知剩余玩家隐藏"再来一局"按钮
+                GameStateListener listener = gameStateListeners.get(gameId);
+                if (listener != null) {
+                    listener.onGameEnded(gameId, quitter + " 已离开游戏");
+                }
+                
+                // 广播游戏状态
+                broadcastGameState(gameId);
+            } else {
+                // 其他情况，广播游戏状态
                 broadcastGameState(gameId);
             }
+        } else if (isSpectator) {
+            // 观战者退出，只需移除并更新状态
+            game.removeSpectator(quitter);
+            broadcastGameState(gameId);
         }
     }
     

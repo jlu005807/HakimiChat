@@ -45,6 +45,7 @@ public class Message implements Serializable {
     private int currentPlayerCount; // 当前玩家数量
     private int maxPlayerCount; // 最大玩家数量
     private String gameName; // 游戏名称（用于显示）
+    private boolean gameEnded; // 游戏是否已结束（房主退出）
 
     public Message(String sender, String content) {
         this.sender = sender;
@@ -256,6 +257,14 @@ public class Message implements Serializable {
 
     public void setGameName(String gameName) {
         this.gameName = gameName;
+    }
+    
+    public boolean isGameEnded() {
+        return gameEnded;
+    }
+
+    public void setGameEnded(boolean gameEnded) {
+        this.gameEnded = gameEnded;
     }
     
     /**

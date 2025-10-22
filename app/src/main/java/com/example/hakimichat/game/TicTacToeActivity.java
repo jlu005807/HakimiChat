@@ -180,9 +180,13 @@ public class TicTacToeActivity extends AppCompatActivity {
         java.util.List<String> players = game.getPlayers();
         if (players.size() >= 1) {
             tvPlayerX.setText("玩家X: " + players.get(0));
+        } else {
+            tvPlayerX.setText("玩家X: ");
         }
         if (players.size() >= 2) {
             tvPlayerO.setText("玩家O: " + players.get(1));
+        } else {
+            tvPlayerO.setText("玩家O: ");
         }
         
         // 更新游戏状态
@@ -247,8 +251,9 @@ public class TicTacToeActivity extends AppCompatActivity {
             
             if (game != null) {
                 if (isSpectator) {
-                    // 观战者退出，只移除观战者，不发送退出消息
+                    // 观战者退出，移除观战者并广播更新
                     game.removeSpectator(username);
+                    gameManager.broadcastGameState(gameId);
                 } else {
                     // 玩家退出游戏，通知其他人
                     // 无论游戏是否结束都要通知，因为游戏结束后对方可能在等待再来一局

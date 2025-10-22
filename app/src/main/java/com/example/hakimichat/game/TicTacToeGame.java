@@ -261,6 +261,25 @@ public class TicTacToeGame extends BaseGame {
             playerOName = null;
             currentPlayer = null;
             isGameStarted = false;
+        } else {
+            // 没有玩家，完全重置
+            playerXName = null;
+            playerOName = null;
+            currentPlayer = null;
+            isGameStarted = false;
+        }
+    }
+    
+    @Override
+    public void removePlayer(String player) {
+        super.removePlayer(player);
+        // 如果移除的是玩家O，需要清空playerOName
+        if (player.equals(playerOName)) {
+            playerOName = null;
+        }
+        // 如果移除的是玩家X，需要清空playerXName
+        if (player.equals(playerXName)) {
+            playerXName = null;
         }
     }
     

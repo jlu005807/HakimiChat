@@ -107,7 +107,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     /**
      * 更新游戏邀请卡片的状态
      */
-    public void updateGameInviteCard(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted) {
+    public void updateGameInviteCard(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted, boolean gameEnded) {
         for (int i = 0; i < messages.size(); i++) {
             Message message = messages.get(i);
             if (message.getMessageType() == Message.TYPE_GAME_INVITE && 
@@ -116,6 +116,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 message.setCurrentPlayerCount(currentPlayers);
                 message.setMaxPlayerCount(maxPlayers);
                 message.setGameStarted(gameStarted);
+                message.setGameEnded(gameEnded);
                 // 通知适配器更新该项
                 notifyItemChanged(i);
                 break;
@@ -225,8 +226,11 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             int currentPlayers = message.getCurrentPlayerCount();
             int maxPlayers = message.getMaxPlayerCount();
             boolean gameStarted = message.isGameStarted();
+            boolean gameEnded = message.isGameEnded();
             
-            if (maxPlayers > 0) {
+            if (gameEnded) {
+                tvGameStatus.setText("游戏已结束");
+            } else if (maxPlayers > 0) {
                 if (gameStarted) {
                     tvGameStatus.setText("游戏进行中");
                 } else {
@@ -240,18 +244,28 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             tvTimestamp.setText(timeFormat.format(new Date(message.getTimestamp())));
             
             // 根据游戏状态显示/隐藏按钮
-            if (gameStarted) {
-                // 游戏已开始，只能观战
+            if (gameEnded) {
+                // 游戏已结束（房主退出），禁用所有操作
                 llButtons.setVisibility(View.GONE);
                 tvDisabledHint.setVisibility(View.VISIBLE);
-                tvDisabledHint.setText("游戏已开始，只能观战");
+                tvDisabledHint.setText("游戏已结束");
+                itemView.setOnClickListener(null);
+            } else if (gameStarted) {
+                // 游戏已开始，只显示观战按钮
+                llButtons.setVisibility(View.VISIBLE);
+                tvDisabledHint.setVisibility(View.GONE);
+                btnJoinGame.setVisibility(View.GONE);
+                btnSpectate.setVisibility(View.VISIBLE);
                 
-                // 设置卡片点击事件，点击可观战
-                itemView.setOnClickListener(v -> {
+                // 观战按钮
+                btnSpectate.setOnClickListener(v -> {
                     if (gameActionListener != null) {
                         gameActionListener.onSpectateGame(message.getGameId(), message.getGameType());
                     }
                 });
+                
+                // 移除卡片点击事件
+                itemView.setOnClickListener(null);
             } else if (currentPlayers >= maxPlayers && maxPlayers > 0) {
                 // 游戏已满，只能观战
                 llButtons.setVisibility(View.GONE);
@@ -268,6 +282,8 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 // 可以加入或观战
                 llButtons.setVisibility(View.VISIBLE);
                 tvDisabledHint.setVisibility(View.GONE);
+                btnJoinGame.setVisibility(View.VISIBLE);
+                btnSpectate.setVisibility(View.VISIBLE);
                 
                 // 加入游戏按钮
                 btnJoinGame.setOnClickListener(v -> {
@@ -282,6 +298,9 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                         gameActionListener.onSpectateGame(message.getGameId(), message.getGameType());
                     }
                 });
+                
+                // 移除卡片点击事件
+                itemView.setOnClickListener(null);
             }
         }
     }
