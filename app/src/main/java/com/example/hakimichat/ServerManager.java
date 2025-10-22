@@ -372,10 +372,22 @@ public class ServerManager {
                     if (messageListener != null && message.getMessageType() != Message.TYPE_NICKNAME_RESULT) {
                         messageListener.onMessageReceived(message);
                     }
-                    // 转发给所有其他客户端（不包括昵称相关消息）
-                    if (message.getMessageType() == Message.TYPE_NORMAL) {
-                        // 将客户端的消息保存到历史记录
-                        addToHistory(message);
+                    // 转发给所有其他客户端
+                    // 普通消息、游戏相关消息都需要转发
+                    if (message.getMessageType() == Message.TYPE_NORMAL ||
+                        message.getMessageType() == Message.TYPE_GAME_INVITE ||
+                        message.getMessageType() == Message.TYPE_GAME_JOIN ||
+                        message.getMessageType() == Message.TYPE_GAME_MOVE ||
+                        message.getMessageType() == Message.TYPE_GAME_STATE ||
+                        message.getMessageType() == Message.TYPE_GAME_END ||
+                        message.getMessageType() == Message.TYPE_GAME_QUIT ||
+                        message.getMessageType() == Message.TYPE_GAME_SPECTATE ||
+                        message.getMessageType() == Message.TYPE_GAME_RESTART) {
+                        
+                        // 将客户端的消息保存到历史记录（只保存普通消息）
+                        if (message.getMessageType() == Message.TYPE_NORMAL) {
+                            addToHistory(message);
+                        }
                         
                         for (ClientHandler client : clients) {
                             if (client != this) {

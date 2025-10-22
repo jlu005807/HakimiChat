@@ -70,6 +70,13 @@ public class TicTacToeActivity extends AppCompatActivity {
             public void onGameEnded(String gameId, String result) {
                 mainHandler.post(() -> {
                     showToast(result);
+                    
+                    // 如果是发起者退出，自动关闭Activity
+                    if (result.contains("发起者退出")) {
+                        finish();
+                        return;
+                    }
+                    
                     updateUI();
                     
                     // 如果是"已离开游戏"的通知，隐藏重新开始按钮
@@ -238,10 +245,15 @@ public class TicTacToeActivity extends AppCompatActivity {
         if (gameId != null) {
             gameManager.removeGameStateListener(gameId);
             
-            // 如果是玩家（非观战者）退出游戏，通知其他人
-            // 无论游戏是否结束都要通知，因为游戏结束后对方可能在等待再来一局
-            if (!isSpectator && game != null) {
-                gameManager.quitGame(gameId, username);
+            if (game != null) {
+                if (isSpectator) {
+                    // 观战者退出，只移除观战者，不发送退出消息
+                    game.removeSpectator(username);
+                } else {
+                    // 玩家退出游戏，通知其他人
+                    // 无论游戏是否结束都要通知，因为游戏结束后对方可能在等待再来一局
+                    gameManager.quitGame(gameId, username);
+                }
             }
         }
     }

@@ -103,6 +103,25 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         messages.clear();
         notifyDataSetChanged();
     }
+    
+    /**
+     * 更新游戏邀请卡片的状态
+     */
+    public void updateGameInviteCard(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted) {
+        for (int i = 0; i < messages.size(); i++) {
+            Message message = messages.get(i);
+            if (message.getMessageType() == Message.TYPE_GAME_INVITE && 
+                gameId.equals(message.getGameId())) {
+                // 更新消息对象
+                message.setCurrentPlayerCount(currentPlayers);
+                message.setMaxPlayerCount(maxPlayers);
+                message.setGameStarted(gameStarted);
+                // 通知适配器更新该项
+                notifyItemChanged(i);
+                break;
+            }
+        }
+    }
 
     class SentMessageViewHolder extends RecyclerView.ViewHolder {
         TextView tvSender, tvMessage, tvTimestamp;

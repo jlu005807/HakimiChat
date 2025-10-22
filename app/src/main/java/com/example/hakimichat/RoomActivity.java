@@ -372,6 +372,15 @@ public class RoomActivity extends AppCompatActivity {
         
         // 初始化GameManager
         gameManager = com.example.hakimichat.game.GameManager.getInstance();
+        
+        // 设置游戏卡片更新监听器
+        gameManager.setGameCardUpdateListener((gameId, currentPlayers, maxPlayers, gameStarted) -> {
+            mainHandler.post(() -> {
+                if (messageAdapter != null) {
+                    messageAdapter.updateGameInviteCard(gameId, currentPlayers, maxPlayers, gameStarted);
+                }
+            });
+        });
     }
 
     private void setupRecyclerView() {
@@ -758,6 +767,9 @@ public class RoomActivity extends AppCompatActivity {
                     } else if (message.getMessageType() == Message.TYPE_GAME_QUIT) {
                         // 退出游戏消息
                         gameManager.handleGameQuit(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_SPECTATE) {
+                        // 观战消息
+                        gameManager.handleSpectate(message);
                     } else if (message.getMessageType() == Message.TYPE_GAME_RESTART) {
                         // 再来一局消息
                         gameManager.handleGameRestart(message);
@@ -888,6 +900,9 @@ public class RoomActivity extends AppCompatActivity {
                     } else if (message.getMessageType() == Message.TYPE_GAME_QUIT) {
                         // 玩家退出游戏
                         gameManager.handleGameQuit(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_SPECTATE) {
+                        // 观战消息
+                        gameManager.handleSpectate(message);
                     } else if (message.getMessageType() == Message.TYPE_GAME_RESTART) {
                         // 重新开始游戏
                         gameManager.handleGameRestart(message);
@@ -1382,6 +1397,11 @@ public class RoomActivity extends AppCompatActivity {
         String gameId = message.getGameId();
         String invitedPlayer = message.getInvitedPlayer();
         
+        // 如果是自己发送的游戏邀请，不显示游戏卡片（避免重复）
+        if (sender.equals(username)) {
+            return;
+        }
+        
         // 缓存游戏类型，以便后续创建游戏实例
         gameTypeCache.put(gameId, gameType);
         
@@ -1458,15 +1478,16 @@ public class RoomActivity extends AppCompatActivity {
      * 观战游戏
      */
     private void spectateGame(String gameId) {
-        // 获取或创建游戏实例
+        // 获取游戏实例（不创建新的）
         com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
         if (game == null) {
+            // 游戏不存在，可能还没有玩家加入
             // 从缓存中获取游戏类型
             String gameType = gameTypeCache.get(gameId);
             if (gameType == null) {
                 gameType = "TicTacToe";  // 默认类型
             }
-            // 创建游戏实例（使用邀请消息中的 gameId）
+            // 创建游戏实例但不修改状态（使用邀请消息中的 gameId）
             game = gameManager.createGameWithId(gameType, gameId);
             if (game == null) {
                 showToast("创建游戏失败");
@@ -1474,13 +1495,23 @@ public class RoomActivity extends AppCompatActivity {
             }
         }
         
-        gameManager.addSpectator(gameId, username);
+        // 添加观战者（本地添加）
+        game.addSpectator(username);
+        
+        // 发送观战通知（通知其他人有人加入观战）
+        Message spectateMsg = Message.createGameSpectateMessage(username, gameId);
+        if (isHost && serverManager != null) {
+            serverManager.broadcastMessage(spectateMsg);
+        } else if (clientManager != null) {
+            clientManager.sendMessage(spectateMsg);
+        }
         
         // 显示系统消息
         Message systemMsg = new Message("系统", "你正在观战");
         messageAdapter.addMessage(systemMsg);
         
         // 以观战模式打开游戏界面
+        // 游戏界面会通过监听器接收实时更新
         openGameActivity(gameId, true);
     }
     

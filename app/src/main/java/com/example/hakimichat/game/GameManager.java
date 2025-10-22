@@ -31,6 +31,15 @@ public class GameManager {
         void onGameEnded(String gameId, String result);
     }
     
+    /**
+     * 游戏卡片更新监听器接口
+     */
+    public interface GameCardUpdateListener {
+        void onGameCardUpdate(String gameId, int currentPlayers, int maxPlayers, boolean gameStarted);
+    }
+    
+    private GameCardUpdateListener gameCardUpdateListener;
+    
     private GameManager() {
         activeGames = new HashMap<>();
         gameStateListeners = new HashMap<>();
@@ -120,6 +129,34 @@ public class GameManager {
     }
     
     /**
+     * 设置游戏卡片更新监听器
+     */
+    public void setGameCardUpdateListener(GameCardUpdateListener listener) {
+        this.gameCardUpdateListener = listener;
+    }
+    
+    /**
+     * 通知游戏卡片更新
+     */
+    private void notifyGameCardUpdate(String gameId) {
+        if (gameCardUpdateListener != null) {
+            Game game = activeGames.get(gameId);
+            if (game != null) {
+                boolean gameStarted = false;
+                if (game instanceof BaseGame) {
+                    gameStarted = ((BaseGame) game).isGameStarted();
+                }
+                gameCardUpdateListener.onGameCardUpdate(
+                    gameId, 
+                    game.getPlayers().size(), 
+                    game.getMaxPlayers(),
+                    gameStarted
+                );
+            }
+        }
+    }
+    
+    /**
      * 发送游戏邀请
      */
     public void sendGameInvite(String gameType, String gameId, String invitedPlayer) {
@@ -166,6 +203,9 @@ public class GameManager {
             // 移动成功，广播游戏状态
             broadcastGameState(gameId);
             
+            // 通知游戏卡片更新
+            notifyGameCardUpdate(gameId);
+            
             // 立即更新本地界面
             GameStateListener listener = gameStateListeners.get(gameId);
             if (listener != null) {
@@ -176,6 +216,9 @@ public class GameManager {
             if (game.isGameOver()) {
                 Message endMessage = Message.createGameEndMessage(gameId, game.getGameResult());
                 sendMessage(endMessage);
+                
+                // 游戏结束时也更新游戏卡片
+                notifyGameCardUpdate(gameId);
                 
                 // 通知监听器
                 if (listener != null) {
@@ -213,7 +256,16 @@ public class GameManager {
         
         Game game = activeGames.get(gameId);
         if (game != null && game.addPlayer(player)) {
-            // 玩家加入成功，广播游戏状态
+            // 玩家加入成功，立即通知本地监听器
+            GameStateListener listener = gameStateListeners.get(gameId);
+            if (listener != null) {
+                listener.onGameStateChanged(gameId, game.getGameState());
+            }
+            
+            // 通知游戏卡片更新
+            notifyGameCardUpdate(gameId);
+            
+            // 广播游戏状态给其他人
             broadcastGameState(gameId);
         }
     }
@@ -251,6 +303,9 @@ public class GameManager {
                 if (listener != null) {
                     listener.onGameStateChanged(gameId, gameState);
                 }
+                
+                // 通知游戏卡片更新
+                notifyGameCardUpdate(gameId);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -272,13 +327,38 @@ public class GameManager {
     }
     
     /**
-     * 添加观战者
+     * 添加观战者（不广播游戏状态）
      */
     public void addSpectator(String gameId, String spectator) {
         Game game = activeGames.get(gameId);
         if (game != null) {
             game.addSpectator(spectator);
+            
+            // 观战者加入不应该触发游戏卡片更新，因为不影响游戏状态
+            // 也不广播游戏状态，避免影响正在进行的游戏
+        }
+    }
+    
+    /**
+     * 处理观战消息（其他人通知我有人观战）
+     */
+    public void handleSpectate(Message message) {
+        String gameId = message.getGameId();
+        String spectator = message.getSender();
+        
+        Game game = activeGames.get(gameId);
+        if (game != null) {
+            game.addSpectator(spectator);
+            
+            // 立即广播当前游戏状态给所有人（包括新加入的观战者）
+            // 这样观战者就能看到当前的棋局
             broadcastGameState(gameId);
+            
+            // 通知本地监听器更新界面（更新观战者列表）
+            GameStateListener listener = gameStateListeners.get(gameId);
+            if (listener != null) {
+                listener.onGameStateChanged(gameId, game.getGameState());
+            }
         }
     }
     
@@ -336,35 +416,101 @@ public class GameManager {
         Game game = activeGames.get(gameId);
         if (game != null) {
             boolean wasGameOver = game.isGameOver();
+            boolean wasGameStarted = false;
+            if (game instanceof BaseGame) {
+                wasGameStarted = ((BaseGame) game).isGameStarted();
+            }
             
-            // 移除退出的玩家
-            game.removePlayer(quitter);
+            // 检查退出者是玩家还是观战者
+            boolean isPlayer = game.getPlayers().contains(quitter);
+            boolean isSpectator = game.getSpectators().contains(quitter);
             
-            // 如果游戏进行中，玩家退出，判定剩余玩家获胜
-            if (!wasGameOver && game.getPlayers().size() == 1) {
-                String winner = game.getPlayers().get(0);
-                String result = winner + " 获胜（对方已退出）";
+            // 检查是否是发起者（第一个玩家）退出
+            boolean isCreator = isPlayer && game.getPlayers().size() > 0 && 
+                               game.getPlayers().get(0).equals(quitter);
+            
+            if (isPlayer) {
+                // 玩家退出
+                game.removePlayer(quitter);
                 
-                // 通知监听器游戏结束
-                GameStateListener listener = gameStateListeners.get(gameId);
-                if (listener != null) {
-                    listener.onGameEnded(gameId, result);
+                if (isCreator) {
+                    // 发起者退出，结束游戏并通知所有人
+                    if (game instanceof BaseGame) {
+                        ((BaseGame) game).isGameOver = true;
+                        ((BaseGame) game).gameResult = "游戏已结束（发起者退出）";
+                    }
+                    
+                    // 通知所有监听器游戏结束（这会让在游戏界面的人看到结束消息）
+                    GameStateListener listener = gameStateListeners.get(gameId);
+                    if (listener != null) {
+                        listener.onGameEnded(gameId, "游戏已结束（发起者退出）");
+                    }
+                    
+                    // 广播游戏结束状态给所有人
+                    Message endMessage = Message.createGameEndMessage(gameId, "游戏已结束（发起者退出）");
+                    sendMessage(endMessage);
+                    
+                    // 通知游戏卡片更新为已结束状态
+                    if (gameCardUpdateListener != null) {
+                        gameCardUpdateListener.onGameCardUpdate(gameId, 0, game.getMaxPlayers(), false);
+                    }
+                    
+                    // 移除游戏
+                    removeGame(gameId);
+                } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 1) {
+                    // 非发起者退出，游戏已开始但未结束
+                    // 重置游戏让发起者可以继续等待其他人，而不是直接结束
+                    String winner = game.getPlayers().get(0);
+                    
+                    // 重置游戏状态
+                    game.reset();
+                    
+                    // 通知监听器游戏已重置，并显示提示信息
+                    GameStateListener listener = gameStateListeners.get(gameId);
+                    if (listener != null) {
+                        // 先通知对方已退出
+                        listener.onGameEnded(gameId, quitter + " 已退出，等待新玩家加入");
+                        // 然后更新游戏状态到等待状态
+                        listener.onGameStateChanged(gameId, game.getGameState());
+                    }
+                    
+                    // 通知游戏卡片更新
+                    notifyGameCardUpdate(gameId);
+                    
+                    // 广播游戏状态
+                    broadcastGameState(gameId);
+                } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 0) {
+                    // 所有玩家都退出了，移除游戏
+                    removeGame(gameId);
+                } else if (wasGameStarted && game.getPlayers().size() == 1) {
+                    // 游戏已开始，有玩家退出，重置游戏让发起者可以继续等待其他人
+                    game.reset();
+                    
+                    // 通知监听器游戏已重置
+                    GameStateListener listener = gameStateListeners.get(gameId);
+                    if (listener != null) {
+                        listener.onGameStateChanged(gameId, game.getGameState());
+                    }
+                    
+                    // 广播游戏状态
+                    broadcastGameState(gameId);
+                } else if (wasGameOver && game.getPlayers().size() >= 1) {
+                    // 游戏已结束，玩家退出，通知剩余玩家隐藏"再来一局"按钮
+                    GameStateListener listener = gameStateListeners.get(gameId);
+                    if (listener != null) {
+                        // 使用特殊的结果字符串来标识这是游戏结束后的退出
+                        listener.onGameEnded(gameId, quitter + " 已离开游戏");
+                    }
+                    
+                    // 广播游戏状态
+                    broadcastGameState(gameId);
+                } else {
+                    // 其他情况，广播游戏状态
+                    broadcastGameState(gameId);
                 }
-                
-                // 广播游戏状态
-                broadcastGameState(gameId);
-            } else if (wasGameOver && game.getPlayers().size() >= 1) {
-                // 游戏已结束，玩家退出，通知剩余玩家隐藏"再来一局"按钮
-                GameStateListener listener = gameStateListeners.get(gameId);
-                if (listener != null) {
-                    // 使用特殊的结果字符串来标识这是游戏结束后的退出
-                    listener.onGameEnded(gameId, quitter + " 已离开游戏");
-                }
-                
-                // 广播游戏状态
-                broadcastGameState(gameId);
-            } else {
-                // 观战者退出或其他情况，只需更新状态
+            } else if (isSpectator) {
+                // 观战者退出，只需移除并更新状态
+                game.removeSpectator(quitter);
                 broadcastGameState(gameId);
             }
         }

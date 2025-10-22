@@ -79,6 +79,7 @@ public class TicTacToeGame extends BaseGame {
                 currentPlayer = playerXName;
             } else if (players.size() == 2) {
                 playerOName = player;
+                currentPlayer = playerXName;  // 设置当前玩家为X（第一个玩家）
                 isGameStarted = true;
             }
             return true;
@@ -254,6 +255,12 @@ public class TicTacToeGame extends BaseGame {
             playerOName = players.get(1);
             currentPlayer = playerXName;
             isGameStarted = true;
+        } else if (players.size() == 1) {
+            // 只有一个玩家（发起者），重置为等待状态
+            playerXName = players.get(0);
+            playerOName = null;
+            currentPlayer = null;
+            isGameStarted = false;
         }
     }
     
