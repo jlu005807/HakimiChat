@@ -79,7 +79,9 @@ public class TicTacToeGame extends BaseGame {
                 currentPlayer = playerXName;
             } else if (players.size() == 2) {
                 playerOName = player;
-                currentPlayer = playerXName;  // 设置当前玩家为X（第一个玩家）
+                // 两名玩家到齐后随机决定先手，避免发起者总是先手
+                java.util.Random rnd = new java.util.Random();
+                currentPlayer = rnd.nextBoolean() ? playerXName : playerOName;
                 isGameStarted = true;
             }
             return true;
@@ -253,7 +255,9 @@ public class TicTacToeGame extends BaseGame {
         if (players.size() >= 2) {
             playerXName = players.get(0);
             playerOName = players.get(1);
-            currentPlayer = playerXName;
+            // 随机决定先手，避免每次重置都由相同玩家先手
+            java.util.Random rnd = new java.util.Random();
+            currentPlayer = rnd.nextBoolean() ? playerXName : playerOName;
             isGameStarted = true;
         } else if (players.size() == 1) {
             // 只有一个玩家（发起者），重置为等待状态

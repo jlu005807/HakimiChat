@@ -61,6 +61,16 @@ public class TicTacToeActivity extends AppCompatActivity {
         initViews();
         setupListeners();
         updateUI();
+        // 如果是单机模式且现在轮到 AI，启动时需要触发 AI 落子（处理电脑先手场景）
+        if (isSinglePlayer && !game.isGameOver()) {
+            java.util.List<String> players = game.getPlayers();
+            if (players.size() >= 2) {
+                String aiName = players.get(1);
+                if (aiName.equals(game.getCurrentPlayer())) {
+                    mainHandler.postDelayed(this::performAIMoveIfNeeded, 300);
+                }
+            }
+        }
         
         // 设置游戏状态监听器
         gameManager.setGameStateListener(gameId, new GameManager.GameStateListener() {
@@ -134,6 +144,14 @@ public class TicTacToeActivity extends AppCompatActivity {
                     game.reset();
                     updateUI();
                     btnRestart.setVisibility(Button.GONE);
+                    // 重置后如果轮到 AI，触发 AI 落子（处理重置后电脑先手）
+                    java.util.List<String> players = game.getPlayers();
+                    if (players.size() >= 2) {
+                        String aiName = players.get(1);
+                        if (aiName.equals(game.getCurrentPlayer())) {
+                            mainHandler.postDelayed(this::performAIMoveIfNeeded, 300);
+                        }
+                    }
                 }
             } else {
                 if (gameManager.canRestartGame(gameId, username)) {
@@ -260,7 +278,7 @@ public class TicTacToeActivity extends AppCompatActivity {
     // Minimax: 找到对 AI 最优的落子，返回 {row, col} 或 null
     private int[] findBestMove(String[][] board, String aiPiece, String humanPiece) {
         int bestScore = Integer.MIN_VALUE;
-        int[] bestMove = null;
+        java.util.List<int[]> bestMoves = new java.util.ArrayList<>();
 
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
@@ -268,15 +286,24 @@ public class TicTacToeActivity extends AppCompatActivity {
                     board[i][j] = aiPiece;
                     int score = minimax(board, 0, false, aiPiece, humanPiece);
                     board[i][j] = "";
+
                     if (score > bestScore) {
                         bestScore = score;
-                        bestMove = new int[]{i, j};
+                        bestMoves.clear();
+                        bestMoves.add(new int[]{i, j});
+                    } else if (score == bestScore) {
+                        // 相同的最优分值，加入候选集合
+                        bestMoves.add(new int[]{i, j});
                     }
                 }
             }
         }
 
-        return bestMove;
+        if (bestMoves.isEmpty()) return null;
+
+        // 如果有多个最优落子，随机选取一个，避免每次都落同一位置
+        java.util.Random rnd = new java.util.Random();
+        return bestMoves.get(rnd.nextInt(bestMoves.size()));
     }
 
     // 递归 Minimax 实现
