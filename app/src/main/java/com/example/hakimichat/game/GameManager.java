@@ -70,6 +70,8 @@ public class GameManager {
         
         if ("TicTacToe".equals(gameType)) {
             game = new TicTacToeGame();
+        } else if ("Gobang".equals(gameType)) {
+            game = new GobangGame();
         }
         // 未来可以在这里添加更多游戏类型
         
@@ -88,6 +90,8 @@ public class GameManager {
         
         if ("TicTacToe".equals(gameType)) {
             game = new TicTacToeGame();
+        } else if ("Gobang".equals(gameType)) {
+            game = new GobangGame();
         }
         // 未来可以在这里添加更多游戏类型
         

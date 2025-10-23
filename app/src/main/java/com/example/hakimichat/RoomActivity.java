@@ -289,8 +289,8 @@ public class RoomActivity extends AppCompatActivity {
         gamePanel.setVisibility(android.view.View.GONE);
         android.util.Log.d("RoomActivity", "游戏面板初始化为GONE，高度为0");
         
-        // 设置游戏面板的RecyclerView
-        recyclerViewGamePanel.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        // 设置游戏面板的RecyclerView（竖向排列）
+        recyclerViewGamePanel.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
         com.example.hakimichat.game.GameListAdapter gamePanelAdapter = 
             new com.example.hakimichat.game.GameListAdapter(gameInfo -> {
                 // 点击游戏后，隐藏面板并显示玩家选择对话框
@@ -1376,30 +1376,90 @@ public class RoomActivity extends AppCompatActivity {
      * 创建单机游戏（人机对战），不发送任何网络邀请
      */
     private void createSinglePlayerGame(String gameType) {
+        // 五子棋选择颜色
+        if ("Gobang".equals(gameType)) {
+            showColorSelectionDialog(gameType);
+        } else {
+            // 其他游戏直接创建
+            createSinglePlayerGameWithColor(gameType, true); // true表示玩家是先手
+        }
+    }
+    
+    /**
+     * 显示颜色选择对话框（黑子/白子）- 用于五子棋
+     */
+    private void showColorSelectionDialog(String gameType) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("选择你的棋子");
+        String[] options = {"黑子（先手）", "白子（后手）"};
+        builder.setItems(options, (dialog, which) -> {
+            boolean playerIsBlack = (which == 0);
+            createSinglePlayerGameWithColor(gameType, playerIsBlack);
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+    
+    /**
+     * 显示符号选择对话框（X/O）- 用于井字棋
+     */
+    private void showSymbolSelectionDialog(String gameType) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("选择你的符号");
+        String[] options = {"X（先手）", "O（后手）"};
+        builder.setItems(options, (dialog, which) -> {
+            boolean playerIsX = (which == 0);
+            createSinglePlayerGameWithColor(gameType, playerIsX);
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+    
+    /**
+     * 创建单机游戏，指定玩家颜色/符号
+     */
+    private void createSinglePlayerGameWithColor(String gameType, boolean playerIsFirst) {
         com.example.hakimichat.game.Game game = gameManager.createGame(gameType);
         if (game == null) {
             showToast("创建游戏失败");
             return;
         }
 
-        // 创建者（本地玩家）加入
-        game.addPlayer(username);
-
         // 添加一个本地 AI 对手，使用特殊名字 "电脑" 避免与真实用户冲突
         String aiName = "电脑";
-        // 如果房间中已有名为电脑的用户，使用带后缀的名字
         int suffix = 1;
         java.util.List<String> players = game.getPlayers();
         while (players.contains(aiName)) {
             aiName = "电脑" + suffix;
             suffix++;
         }
-        game.addPlayer(aiName);
+
+        // 在添加玩家之前先设置AI模式，防止随机黑白方逻辑生效
+        String choiceMsg;
+        if (game instanceof com.example.hakimichat.game.GobangGame) {
+            ((com.example.hakimichat.game.GobangGame) game).setAiMode(true, username);
+            choiceMsg = playerIsFirst ? "黑子（先手）" : "白子（后手）";
+        } else if (game instanceof com.example.hakimichat.game.TicTacToeGame) {
+            choiceMsg = playerIsFirst ? "X（先手）" : "O（后手）";
+        } else {
+            choiceMsg = playerIsFirst ? "先手" : "后手";
+        }
+
+        // 根据玩家选择的颜色/符号决定加入顺序
+        if (playerIsFirst) {
+            // 玩家先手
+            game.addPlayer(username);
+            game.addPlayer(aiName);
+        } else {
+            // 玩家后手
+            game.addPlayer(aiName);
+            game.addPlayer(username);
+        }
 
         String gameId = ((com.example.hakimichat.game.BaseGame) game).getGameId();
 
         // 不发送邀请或广播，直接打开本地游戏界面，传递单机标志
-        Message systemMsg = new Message("系统", "已启动单机模式：你对阵 " + aiName);
+        Message systemMsg = new Message("系统", "已启动单机模式：你执" + choiceMsg + " 对阵 " + aiName);
         messageAdapter.addMessage(systemMsg);
 
         openGameActivity(gameId, false, true);
@@ -1467,7 +1527,8 @@ public class RoomActivity extends AppCompatActivity {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         
         // 根据gameType获取游戏名称
-        String gameName = "TicTacToe".equals(gameType) ? "井字棋" : gameType;
+        String gameName = "TicTacToe".equals(gameType) ? "井字棋" : 
+                          "Gobang".equals(gameType) ? "五子棋" : gameType;
         
         builder.setTitle("游戏邀请");
         builder.setMessage(sender + " 邀请你一起玩" + gameName + "，是否接受？");
@@ -1567,12 +1628,29 @@ public class RoomActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_GAME = 1001;
     
     private void openGameActivity(String gameId, boolean isSpectator, boolean isSinglePlayer) {
-        android.content.Intent intent = new android.content.Intent(this, 
-            com.example.hakimichat.game.TicTacToeActivity.class);
-        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_GAME_ID, gameId);
-        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_USERNAME, username);
-        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SPECTATOR, isSpectator);
-        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SINGLE_PLAYER, isSinglePlayer);
+        // 获取游戏类型
+        String gameType = gameTypeCache.get(gameId);
+        if (gameType == null) {
+            com.example.hakimichat.game.Game game = gameManager.getGame(gameId);
+            if (game != null) {
+                gameType = game.getGameType();
+            } else {
+                gameType = "TicTacToe"; // 默认
+            }
+        }
+        
+        Class<?> activityClass;
+        if ("Gobang".equals(gameType)) {
+            activityClass = com.example.hakimichat.game.GobangActivity.class;
+        } else {
+            activityClass = com.example.hakimichat.game.TicTacToeActivity.class;
+        }
+        
+        android.content.Intent intent = new android.content.Intent(this, activityClass);
+        intent.putExtra("game_id", gameId);
+        intent.putExtra("username", username);
+        intent.putExtra("is_spectator", isSpectator);
+        intent.putExtra("is_single_player", isSinglePlayer);
         startActivityForResult(intent, REQUEST_CODE_GAME);
     }
     

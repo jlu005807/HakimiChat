@@ -45,12 +45,20 @@ public class GameListAdapter extends RecyclerView.Adapter<GameListAdapter.GameVi
         this.listener = listener;
         
         // 添加可用的游戏
-        TicTacToeGame dummyGame = new TicTacToeGame();
+        TicTacToeGame dummyTicTacToe = new TicTacToeGame();
         games.add(new GameInfo(
-            dummyGame.getGameType(),
-            dummyGame.getGameName(),
-            dummyGame.getGameDescription(),
-            dummyGame.getGameIcon()
+            dummyTicTacToe.getGameType(),
+            dummyTicTacToe.getGameName(),
+            dummyTicTacToe.getGameDescription(),
+            dummyTicTacToe.getGameIcon()
+        ));
+        
+        GobangGame dummyGobang = new GobangGame();
+        games.add(new GameInfo(
+            dummyGobang.getGameType(),
+            dummyGobang.getGameName(),
+            dummyGobang.getGameDescription(),
+            dummyGobang.getGameIcon()
         ));
         
         // 未来可以在这里添加更多游戏
