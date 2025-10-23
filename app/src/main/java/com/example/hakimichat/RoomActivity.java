@@ -1338,25 +1338,71 @@ public class RoomActivity extends AppCompatActivity {
         availablePlayers.remove(username);
         
         if (availablePlayers.isEmpty()) {
-            showToast("房间里没有其他玩家");
+            // 提示并自动进入单机模式
+            showToast("房间里没有其他玩家，进入单机模式吧！");
+            // 延迟一点再进入，保证 Toast 可见
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                createSinglePlayerGame(gameInfo.gameType);
+            }, 400);
             return;
         }
         
-        // 添加"所有人"选项
-        String[] playerOptions = new String[availablePlayers.size() + 1];
+        // 添加"所有人"选项，以及最后添加一个"单机（人机对战）"选项
+        String[] playerOptions = new String[availablePlayers.size() + 2];
         playerOptions[0] = "所有人（谁先加入谁玩）";
         for (int i = 0; i < availablePlayers.size(); i++) {
             playerOptions[i + 1] = availablePlayers.get(i);
         }
+        // 最后一个选项为单机
+        playerOptions[playerOptions.length - 1] = "单机（人机对战）";
         
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle("邀请谁一起玩" + gameInfo.gameName + "?");
         builder.setItems(playerOptions, (dialog, which) -> {
+            // 如果选择最后一个，启动单机模式
+            if (which == playerOptions.length - 1) {
+                createSinglePlayerGame(gameInfo.gameType);
+                return;
+            }
+
             String invitedPlayer = which == 0 ? null : availablePlayers.get(which - 1);
             createAndInviteGame(gameInfo.gameType, invitedPlayer);
         });
         builder.setNegativeButton("取消", null);
         builder.show();
+    }
+
+    /**
+     * 创建单机游戏（人机对战），不发送任何网络邀请
+     */
+    private void createSinglePlayerGame(String gameType) {
+        com.example.hakimichat.game.Game game = gameManager.createGame(gameType);
+        if (game == null) {
+            showToast("创建游戏失败");
+            return;
+        }
+
+        // 创建者（本地玩家）加入
+        game.addPlayer(username);
+
+        // 添加一个本地 AI 对手，使用特殊名字 "电脑" 避免与真实用户冲突
+        String aiName = "电脑";
+        // 如果房间中已有名为电脑的用户，使用带后缀的名字
+        int suffix = 1;
+        java.util.List<String> players = game.getPlayers();
+        while (players.contains(aiName)) {
+            aiName = "电脑" + suffix;
+            suffix++;
+        }
+        game.addPlayer(aiName);
+
+        String gameId = ((com.example.hakimichat.game.BaseGame) game).getGameId();
+
+        // 不发送邀请或广播，直接打开本地游戏界面，传递单机标志
+        Message systemMsg = new Message("系统", "已启动单机模式：你对阵 " + aiName);
+        messageAdapter.addMessage(systemMsg);
+
+        openGameActivity(gameId, false, true);
     }
     
     /**
@@ -1384,8 +1430,8 @@ public class RoomActivity extends AppCompatActivity {
         Message systemMsg = new Message("系统", inviteMsg);
         messageAdapter.addMessage(systemMsg);
         
-        // 打开游戏界面
-        openGameActivity(gameId, false);
+    // 打开游戏界面
+    openGameActivity(gameId, false, false);
     }
     
     /**
@@ -1470,8 +1516,8 @@ public class RoomActivity extends AppCompatActivity {
         Message systemMsg = new Message("系统", "你加入了游戏");
         messageAdapter.addMessage(systemMsg);
         
-        // 打开游戏界面
-        openGameActivity(gameId, false);
+    // 打开游戏界面
+    openGameActivity(gameId, false, false);
     }
     
     /**
@@ -1510,9 +1556,9 @@ public class RoomActivity extends AppCompatActivity {
         Message systemMsg = new Message("系统", "你正在观战");
         messageAdapter.addMessage(systemMsg);
         
-        // 以观战模式打开游戏界面
-        // 游戏界面会通过监听器接收实时更新
-        openGameActivity(gameId, true);
+    // 以观战模式打开游戏界面
+    // 游戏界面会通过监听器接收实时更新
+    openGameActivity(gameId, true, false);
     }
     
     /**
@@ -1520,12 +1566,13 @@ public class RoomActivity extends AppCompatActivity {
      */
     private static final int REQUEST_CODE_GAME = 1001;
     
-    private void openGameActivity(String gameId, boolean isSpectator) {
+    private void openGameActivity(String gameId, boolean isSpectator, boolean isSinglePlayer) {
         android.content.Intent intent = new android.content.Intent(this, 
             com.example.hakimichat.game.TicTacToeActivity.class);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_GAME_ID, gameId);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_USERNAME, username);
         intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SPECTATOR, isSpectator);
+        intent.putExtra(com.example.hakimichat.game.TicTacToeActivity.EXTRA_IS_SINGLE_PLAYER, isSinglePlayer);
         startActivityForResult(intent, REQUEST_CODE_GAME);
     }
     
@@ -1583,8 +1630,8 @@ public class RoomActivity extends AppCompatActivity {
         Message systemMsg = new Message("系统", "你加入了游戏");
         messageAdapter.addMessage(systemMsg);
         
-        // 打开游戏界面
-        openGameActivity(gameId, false);
+    // 打开游戏界面
+    openGameActivity(gameId, false, false);
     }
     
     /**
@@ -1616,7 +1663,7 @@ public class RoomActivity extends AppCompatActivity {
         Message systemMsg = new Message("系统", "你正在观战");
         messageAdapter.addMessage(systemMsg);
         
-        // 以观战模式打开游戏界面
-        openGameActivity(gameId, true);
+    // 以观战模式打开游戏界面
+    openGameActivity(gameId, true, false);
     }
 }
