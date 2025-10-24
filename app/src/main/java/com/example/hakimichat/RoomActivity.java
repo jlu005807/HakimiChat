@@ -1435,14 +1435,8 @@ public class RoomActivity extends AppCompatActivity {
         }
 
         // 在添加玩家之前先设置AI模式，防止随机黑白方逻辑生效
-        String choiceMsg;
         if (game instanceof com.example.hakimichat.game.GobangGame) {
             ((com.example.hakimichat.game.GobangGame) game).setAiMode(true, username);
-            choiceMsg = playerIsFirst ? "黑子（先手）" : "白子（后手）";
-        } else if (game instanceof com.example.hakimichat.game.TicTacToeGame) {
-            choiceMsg = playerIsFirst ? "X（先手）" : "O（后手）";
-        } else {
-            choiceMsg = playerIsFirst ? "先手" : "后手";
         }
 
         // 根据玩家选择的颜色/符号决定加入顺序
@@ -1457,10 +1451,6 @@ public class RoomActivity extends AppCompatActivity {
         }
 
         String gameId = ((com.example.hakimichat.game.BaseGame) game).getGameId();
-
-        // 不发送邀请或广播，直接打开本地游戏界面，传递单机标志
-        Message systemMsg = new Message("系统", "已启动单机模式：你执" + choiceMsg + " 对阵 " + aiName);
-        messageAdapter.addMessage(systemMsg);
 
         openGameActivity(gameId, false, true);
     }

@@ -1,10 +1,13 @@
 package com.example.hakimichat.game;
 
 import android.graphics.Point;
+
 import com.example.hakimichat.R;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,9 +36,10 @@ public class GobangGame extends BaseGame {
     private boolean isAiEnabled = false;
     private boolean isStrictMode = false;
     private int humanPlayerColor = BLACK_PIECE;
+    private String humanPlayerName = null;  // 记录真人玩家名字
 
     private final Stack<Point> moveHistory = new Stack<>();
-    
+
     // AI相关
     private static final int[][] POSITIONAL_VALUE = {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -64,7 +68,7 @@ public class GobangGame extends BaseGame {
         initZobrist();
         initGame();
     }
-    
+
     private void initZobrist() {
         Random rand = new Random();
         for (int i = 0; i < BOARD_SIZE; i++)
@@ -137,7 +141,7 @@ public class GobangGame extends BaseGame {
             } else if (players.size() == 2) {
                 whitePlayerName = player;
                 isGameStarted = true;
-                
+
                 // 如果不是AI模式（真人对战），随机决定谁是黑方
                 if (!isAiEnabled) {
                     Random random = new Random();
@@ -147,6 +151,15 @@ public class GobangGame extends BaseGame {
                         blackPlayerName = whitePlayerName;
                         whitePlayerName = temp;
                         currentPlayer = blackPlayerName;
+                    }
+                } else {
+                    // AI模式：现在可以确定humanPlayerColor了
+                    if (humanPlayerName != null) {
+                        if (humanPlayerName.equals(blackPlayerName)) {
+                            this.humanPlayerColor = BLACK_PIECE;
+                        } else {
+                            this.humanPlayerColor = WHITE_PIECE;
+                        }
                     }
                 }
             }
@@ -158,11 +171,8 @@ public class GobangGame extends BaseGame {
     public void setAiMode(boolean isAi, String humanPlayer) {
         this.isAiEnabled = isAi;
         if (isAi) {
-            if (humanPlayer.equals(blackPlayerName)) {
-                this.humanPlayerColor = BLACK_PIECE;
-            } else {
-                this.humanPlayerColor = WHITE_PIECE;
-            }
+            this.humanPlayerName = humanPlayer;
+            // humanPlayerColor在addPlayer完成后再设置
         }
     }
 
@@ -210,20 +220,26 @@ public class GobangGame extends BaseGame {
             return false;
         }
     }
-    
+
     private void updateBoardState(int x, int y, int pieceType) {
+        updateBoardState(x, y, pieceType, true);
+    }
+    
+    private void updateBoardState(int x, int y, int pieceType, boolean updateHistory) {
         int originalPiece = board[x][y];
         if (originalPiece != EMPTY) currentZobristKey ^= zobristTable[x][y][originalPiece];
         if (pieceType != EMPTY) currentZobristKey ^= zobristTable[x][y][pieceType];
         board[x][y] = pieceType;
         if (pieceType != EMPTY) {
             moveCount++;
-            moveHistory.push(new Point(x, y));
+            if (updateHistory) {
+                moveHistory.push(new Point(x, y));
+            }
         } else {
             moveCount--;
         }
     }
-    
+
     private void checkGameStatus(int x, int y) {
         if (checkWin(x, y)) {
             isGameOver = true;
@@ -237,28 +253,39 @@ public class GobangGame extends BaseGame {
         }
     }
 
+    /**
+     * 检查是否可以悔棋
+     * 轮到玩家且棋盘上棋子大于等于2时才能悔棋
+     *
+     * @return 是否可以悔棋
+     */
+    public boolean canUndo() {
+        if (!isAiEnabled || isGameOver) return false;
+
+        // 至少需要有2步棋
+        if (moveCount < 2) return false;
+
+        // 检查当前轮到的是否是真人玩家
+        String humanPlayer = (humanPlayerColor == BLACK_PIECE) ? blackPlayerName : whitePlayerName;
+        return currentPlayer != null && currentPlayer.equals(humanPlayer);
+    }
+
     public boolean undoMove() {
-        // Only allow undo in AI mode
-        if (!isAiEnabled || moveHistory.isEmpty()) {
-            return false;
-        }
+        android.util.Log.d("GobangGame", "undoMove: isAiEnabled=" + isAiEnabled + ", moveCount=" + moveCount + ", moveHistory.size=" + moveHistory.size());
 
-        // In AI mode, undo 2 moves (player and AI) or 1 if only one move exists
-        int stepsToUndo = 0;
-        if (moveCount >= 2) {
-            stepsToUndo = 2;
-        } else if (moveCount > 0) {
-            stepsToUndo = 1;
-        }
+        if (moveCount < 2) return false;
 
-        if (stepsToUndo == 0) return false;
-
-        for (int i = 0; i < stepsToUndo && !moveHistory.isEmpty(); i++) {
+        // 悔两步
+        int undoSteps = 0;
+        for (int i = 0; i < 2; i++) {
+            if (moveHistory.isEmpty()) break;
             Point last = moveHistory.pop();
             updateBoardState(last.x, last.y, EMPTY);
             turnColor = (turnColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE;
+            undoSteps++;
         }
-        
+        android.util.Log.d("GobangGame", "AI mode: undid " + undoSteps + " steps");
+
         currentPlayer = (turnColor == BLACK_PIECE) ? blackPlayerName : whitePlayerName;
         isGameOver = false;
         gameResult = null;
@@ -276,7 +303,7 @@ public class GobangGame extends BaseGame {
         }
         return countInLine >= 5;
     }
-    
+
     private int getLineCountForWinCheck(int x, int y, int pieceType) {
         int[][] directions = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
         int maxCount = 0;
@@ -349,7 +376,7 @@ public class GobangGame extends BaseGame {
         board[x][y] = EMPTY;
         return maxCount;
     }
-    
+
     private String getLineType(int x, int y, int dx, int dy, int pieceType) {
         int count = 1, openEnds = 0;
         for (int i = 1; i < 6; i++) {
@@ -393,6 +420,9 @@ public class GobangGame extends BaseGame {
             state.put("players", playersToJson());
             state.put("spectators", spectatorsToJson());
             state.put("isStrictMode", isStrictMode);
+            state.put("isAiEnabled", isAiEnabled);
+            state.put("humanPlayerName", humanPlayerName);
+            state.put("humanPlayerColor", humanPlayerColor);
 
             JSONArray boardArray = new JSONArray();
             for (int i = 0; i < BOARD_SIZE; i++) {
@@ -421,7 +451,10 @@ public class GobangGame extends BaseGame {
             this.blackPlayerName = gameState.optString("blackPlayerName");
             this.whitePlayerName = gameState.optString("whitePlayerName");
             this.isStrictMode = gameState.optBoolean("isStrictMode", false);
-            
+            this.isAiEnabled = gameState.optBoolean("isAiEnabled", false);
+            this.humanPlayerName = gameState.optString("humanPlayerName", null);
+            this.humanPlayerColor = gameState.optInt("humanPlayerColor", BLACK_PIECE);
+
             playersFromJson(gameState.getJSONArray("players"));
             spectatorsFromJson(gameState.getJSONArray("spectators"));
 
@@ -432,7 +465,7 @@ public class GobangGame extends BaseGame {
                     this.board[i][j] = row.getInt(j);
                 }
             }
-            
+
             // Recalculate turn color based on move count
             this.turnColor = (this.moveCount % 2 == 0) ? BLACK_PIECE : WHITE_PIECE;
 
@@ -446,25 +479,25 @@ public class GobangGame extends BaseGame {
         if (isGameOver) return null;
         startTime = System.currentTimeMillis();
         transpositionTable.clear();
-        
+
         int aiColor = (humanPlayerColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE;
-        
+
         // 1. Find kill move (double threats)
         Point killMove = findKillMove(aiColor);
         if (killMove != null) return killMove;
-        
+
         // 2. Block opponent's kill move
         Point urgentDefense = findKillMove(humanPlayerColor);
         if (urgentDefense != null) return urgentDefense;
-        
+
         // 3. Find winning move
         Point winningMove = findWinningMove(aiColor);
         if (winningMove != null) return winningMove;
-        
+
         // 4. Block opponent's winning move
         Point defensiveMove = findWinningMove(humanPlayerColor);
         if (defensiveMove != null) return defensiveMove;
-        
+
         // 5. Opening moves
         if (moveCount <= 1) {
             if (board[7][7] == EMPTY) return new Point(7, 7);
@@ -475,11 +508,11 @@ public class GobangGame extends BaseGame {
                         if (isValid(7 + dx, 7 + dy) && board[7 + dx][7 + dy] == EMPTY)
                             return new Point(7 + dx, 7 + dy);
         }
-        
+
         // 6. Iterative deepening search
         return findBestMoveByIterativeDeepening();
     }
-    
+
     private Point findBestMoveByIterativeDeepening() {
         Point bestMove = null;
         for (int depth = 1; depth <= MAX_SEARCH_DEPTH; depth++) {
@@ -491,7 +524,7 @@ public class GobangGame extends BaseGame {
         }
         return bestMove;
     }
-    
+
     private Point findBestMoveAtDepth(int depth) {
         Point bestMove = null;
         int bestScore = Integer.MIN_VALUE;
@@ -502,10 +535,10 @@ public class GobangGame extends BaseGame {
                     if (board[i][j] == EMPTY) return new Point(i, j);
         }
         for (Point move : moves) {
-            updateBoardState(move.x, move.y, turnColor);
-            int score = minimax(depth - 1, Integer.MIN_VALUE, Integer.MAX_VALUE, false, 
-                (turnColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE);
-            updateBoardState(move.x, move.y, EMPTY);
+            updateBoardState(move.x, move.y, turnColor, false);  // AI搜索不更新history
+            int score = minimax(depth - 1, Integer.MIN_VALUE, Integer.MAX_VALUE, false,
+                    (turnColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE);
+            updateBoardState(move.x, move.y, EMPTY, false);  // AI搜索不更新history
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
@@ -513,26 +546,26 @@ public class GobangGame extends BaseGame {
         }
         return bestMove;
     }
-    
+
     private int minimax(int depth, int alpha, int beta, boolean isMaximizingPlayer, int currentTurnColor) {
         if (System.currentTimeMillis() - startTime > TIME_LIMIT_MS) return 0;
         TranspositionEntry entry = transpositionTable.get(currentZobristKey);
         if (entry != null && entry.depth >= depth) return entry.score;
-        
+
         int immediateWinner = getImmediateWinner();
         if (immediateWinner != EMPTY) return evaluate(immediateWinner);
         if (depth == 0) return evaluateBoard();
-        
+
         List<Point> moves = generateMoves();
         if (moves.isEmpty()) return evaluateBoard();
-        
+
         int nextTurnColor = (currentTurnColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE;
         if (isMaximizingPlayer) {
             int maxEval = Integer.MIN_VALUE;
             for (Point move : moves) {
-                updateBoardState(move.x, move.y, currentTurnColor);
+                updateBoardState(move.x, move.y, currentTurnColor, false);  // AI搜索不更新history
                 int eval = minimax(depth - 1, alpha, beta, false, nextTurnColor);
-                updateBoardState(move.x, move.y, EMPTY);
+                updateBoardState(move.x, move.y, EMPTY, false);  // AI搜索不更新history
                 maxEval = Math.max(maxEval, eval);
                 alpha = Math.max(alpha, eval);
                 if (beta <= alpha) break;
@@ -542,9 +575,9 @@ public class GobangGame extends BaseGame {
         } else {
             int minEval = Integer.MAX_VALUE;
             for (Point move : moves) {
-                updateBoardState(move.x, move.y, currentTurnColor);
+                updateBoardState(move.x, move.y, currentTurnColor, false);  // AI搜索不更新history
                 int eval = minimax(depth - 1, alpha, beta, true, nextTurnColor);
-                updateBoardState(move.x, move.y, EMPTY);
+                updateBoardState(move.x, move.y, EMPTY, false);  // AI搜索不更新history
                 minEval = Math.min(minEval, eval);
                 beta = Math.min(beta, eval);
                 if (beta <= alpha) break;
@@ -553,19 +586,19 @@ public class GobangGame extends BaseGame {
             return minEval;
         }
     }
-    
+
     private int evaluate(int winner) {
         int aiColor = (humanPlayerColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE;
         if (winner == aiColor) return 1000000;
         if (winner == humanPlayerColor) return -1000000;
         return 0;
     }
-    
+
     private int evaluateBoard() {
         int aiColor = (humanPlayerColor == BLACK_PIECE) ? WHITE_PIECE : BLACK_PIECE;
         return calculateTotalScore(aiColor) - calculateTotalScore(humanPlayerColor);
     }
-    
+
     private int calculateTotalScore(int pieceType) {
         int totalScore = 0;
         for (int i = 0; i < BOARD_SIZE; i++)
@@ -575,7 +608,7 @@ public class GobangGame extends BaseGame {
         totalScore += calculateLineScore(pieceType);
         return totalScore;
     }
-    
+
     private int calculateLineScore(int pieceType) {
         int score = 0;
         boolean[][][] visited = new boolean[BOARD_SIZE][BOARD_SIZE][4];
@@ -597,7 +630,7 @@ public class GobangGame extends BaseGame {
             }
         return score;
     }
-    
+
     private int[] countLineOnBoard(int x, int y, int[] dir, int pieceType) {
         int count = 1;
         int openEnds = 0;
@@ -624,7 +657,7 @@ public class GobangGame extends BaseGame {
         }
         return new int[]{count, openEnds};
     }
-    
+
     private int getScoreFromLine(int count, int openEnds) {
         if (count >= 5) return 500000;
         if (count == 4) return (openEnds == 2) ? 50000 : 500;
@@ -632,7 +665,7 @@ public class GobangGame extends BaseGame {
         if (count == 2) return (openEnds == 2) ? 5 : 0;
         return 0;
     }
-    
+
     private List<Point> generateMoves() {
         List<PointScore> scoredMoves = new ArrayList<>();
         for (int i = 0; i < BOARD_SIZE; i++)
@@ -651,7 +684,7 @@ public class GobangGame extends BaseGame {
         }
         return moves;
     }
-    
+
     private int scoreSingleLine(int x, int y, int pieceType) {
         int score = 0;
         int[][] directions = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
@@ -661,7 +694,7 @@ public class GobangGame extends BaseGame {
         }
         return score;
     }
-    
+
     private int[] countLine(int x, int y, int[] dir, int pieceType) {
         board[x][y] = pieceType;
         int count = 0, openEnds = 0;
@@ -692,7 +725,7 @@ public class GobangGame extends BaseGame {
         board[x][y] = EMPTY;
         return new int[]{count + 1, openEnds};
     }
-    
+
     private Point findKillMove(int pieceType) {
         List<Point> candidates = generateMoves();
         for (Point p : candidates) {
@@ -710,7 +743,7 @@ public class GobangGame extends BaseGame {
         }
         return null;
     }
-    
+
     private Point findWinningMove(int pieceType) {
         for (int i = 0; i < BOARD_SIZE; i++)
             for (int j = 0; j < BOARD_SIZE; j++) {
@@ -725,7 +758,7 @@ public class GobangGame extends BaseGame {
             }
         return null;
     }
-    
+
     private int getImmediateWinner() {
         for (int i = 0; i < BOARD_SIZE; i++)
             for (int j = 0; j < BOARD_SIZE; j++)
@@ -741,19 +774,21 @@ public class GobangGame extends BaseGame {
             }
         return false;
     }
-    
+
     private static class PointScore {
         Point point;
         int score;
+
         PointScore(Point point, int score) {
             this.point = point;
             this.score = score;
         }
     }
-    
+
     private static class TranspositionEntry {
         int score;
         int depth;
+
         TranspositionEntry(int score, int depth) {
             this.score = score;
             this.depth = depth;

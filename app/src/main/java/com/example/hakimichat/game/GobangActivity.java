@@ -127,11 +127,11 @@ public class GobangActivity extends AppCompatActivity {
         // 悔棋按钮（仅单机模式可见）
         btnUndo.setOnClickListener(v -> {
             if (game != null && game.isAiEnabled()) {
-                if (game.undoMove()) {
+                if (game.canUndo() && game.undoMove()) {
                     updateUI();
                     showToast("已悔棋");
                 } else {
-                    showToast("无法悔棋");
+                    showToast("当前无法悔棋");
                 }
             } else {
                 showToast("真人对战不支持悔棋");
@@ -146,6 +146,12 @@ public class GobangActivity extends AppCompatActivity {
                     game.reset();
                     updateUI();
                     btnRestart.setVisibility(Button.GONE);
+                    
+                    // 如果是AI先手，触发AI移动
+                    String currentPlayer = game.getCurrentPlayer();
+                    if (currentPlayer != null && !currentPlayer.equals(username)) {
+                        mainHandler.postDelayed(this::performAIMove, 500);
+                    }
                 }
             } else {
                 if (gameManager.canRestartGame(gameId, username)) {
@@ -303,6 +309,11 @@ public class GobangActivity extends AppCompatActivity {
         // 显示悔棋按钮（仅人机对战模式）
         if (game != null && game.isAiEnabled() && !game.isGameOver()) {
             btnUndo.setVisibility(Button.VISIBLE);
+            // 根据canUndo()动态启用/禁用按钮
+            boolean canUndo = game.canUndo();
+            btnUndo.setEnabled(canUndo);
+            // 禁用时降低透明度，启用时恢复
+            btnUndo.setAlpha(canUndo ? 1.0f : 0.5f);
         } else {
             btnUndo.setVisibility(Button.GONE);
         }
