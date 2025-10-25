@@ -471,25 +471,37 @@ public class GameManager {
                 // 非发起者退出，游戏已开始但未结束
                 // 重置游戏让发起者可以继续等待其他人
                 game.reset();
+                // 确保 isGameStarted 标记反映当前玩家数量（以兼容不同游戏实现）
+                if (game instanceof BaseGame) {
+                    ((BaseGame) game).isGameStarted = game.getPlayers().size() >= game.getMinPlayers();
+                    ((BaseGame) game).isGameOver = false;
+                }
                 
                 // 通知监听器游戏已重置
                 GameStateListener listener = gameStateListeners.get(gameId);
                 if (listener != null) {
-                    listener.onGameEnded(gameId, quitter + " 已退出，等待新玩家加入");
+                    // 先更新界面状态再发出结束通知，这样 Activity 能先根据新状态（等待）刷新 UI
                     listener.onGameStateChanged(gameId, game.getGameState());
+                    listener.onGameEnded(gameId, quitter + " 已退出，等待新玩家加入");
                 }
-                
-                // 通知游戏卡片更新
+
+                // 通知游戏卡片更新并广播游戏状态
                 notifyGameCardUpdate(gameId);
-                
-                // 广播游戏状态
                 broadcastGameState(gameId);
             } else if (wasGameStarted && !wasGameOver && game.getPlayers().size() == 0) {
                 // 所有玩家都退出了，移除游戏
                 removeGame(gameId);
+                // 游戏被移除，通知卡片更新为已结束（无玩家）
+                if (gameCardUpdateListener != null) {
+                    gameCardUpdateListener.onGameCardUpdate(gameId, 0, game.getMaxPlayers(), false, true);
+                }
             } else if (wasGameStarted && game.getPlayers().size() == 1) {
                 // 游戏已开始，有玩家退出，重置游戏
                 game.reset();
+                if (game instanceof BaseGame) {
+                    ((BaseGame) game).isGameStarted = game.getPlayers().size() >= game.getMinPlayers();
+                    ((BaseGame) game).isGameOver = false;
+                }
                 
                 // 通知监听器
                 GameStateListener listener = gameStateListeners.get(gameId);
@@ -498,6 +510,8 @@ public class GameManager {
                 }
                 
                 // 广播游戏状态
+                // 同步卡片状态并广播
+                notifyGameCardUpdate(gameId);
                 broadcastGameState(gameId);
             } else if (wasGameOver && game.getPlayers().size() >= 1) {
                 // 游戏已结束，玩家退出，通知剩余玩家隐藏"再来一局"按钮
@@ -505,11 +519,12 @@ public class GameManager {
                 if (listener != null) {
                     listener.onGameEnded(gameId, quitter + " 已离开游戏");
                 }
-                
-                // 广播游戏状态
+                // 通知卡片更新并广播
+                notifyGameCardUpdate(gameId);
                 broadcastGameState(gameId);
             } else {
                 // 其他情况，广播游戏状态
+                notifyGameCardUpdate(gameId);
                 broadcastGameState(gameId);
             }
         } else if (isSpectator) {

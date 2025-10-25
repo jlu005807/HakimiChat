@@ -1,6 +1,7 @@
 package com.example.hakimichat.game;
 
 import android.graphics.Point;
+import android.widget.ImageView;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,6 +27,7 @@ public class GobangActivity extends AppCompatActivity {
 
     private GobangBoardView boardView;
     private TextView tvGameStatus, tvBlackPlayer, tvWhitePlayer, tvSpectators;
+    private TextView ivBlackAvatar, ivWhiteAvatar;
     private Button btnUndo, btnRestart, btnExit;
 
     private String gameId;
@@ -113,12 +115,16 @@ public class GobangActivity extends AppCompatActivity {
         boardView = findViewById(R.id.gobangBoard);
         tvGameStatus = findViewById(R.id.tvGameStatus);
         tvBlackPlayer = findViewById(R.id.tvBlackPlayer);
+    ivBlackAvatar = findViewById(R.id.ivBlackAvatar);
         tvWhitePlayer = findViewById(R.id.tvWhitePlayer);
+    ivWhiteAvatar = findViewById(R.id.ivWhiteAvatar);
         tvSpectators = findViewById(R.id.tvSpectators);
         btnUndo = findViewById(R.id.btnUndo);
         btnRestart = findViewById(R.id.btnRestart);
         btnExit = findViewById(R.id.btnExit);
     }
+
+    // 头像由布局中的 TextView 展示，这里不再生成 Bitmap
 
     private void setupListeners() {
         // 棋盘点击监听
@@ -263,14 +269,43 @@ public class GobangActivity extends AppCompatActivity {
             tvWhitePlayer.setText("白方: ");
         }
 
+        // 头像显示：将头像绘制为昵称首字符（类似聊天），若为 AI（以"电脑"开头）也显示首字
+        try {
+            int sizeDp = 44; // 与布局中宽高一致
+            float density = getResources().getDisplayMetrics().density;
+            int sizePx = Math.round(sizeDp * density);
+
+            if (blackPlayer != null) {
+                String displayName = blackPlayer.startsWith("电脑") ? "电" : (blackPlayer.isEmpty() ? "?" : String.valueOf(blackPlayer.charAt(0)));
+                ivBlackAvatar.setText(displayName);
+            } else {
+                ivBlackAvatar.setText("");
+            }
+
+            if (whitePlayer != null) {
+                String displayName = whitePlayer.startsWith("电脑") ? "电" : (whitePlayer.isEmpty() ? "?" : String.valueOf(whitePlayer.charAt(0)));
+                ivWhiteAvatar.setText(displayName);
+            } else {
+                ivWhiteAvatar.setText("");
+            }
+        } catch (Exception ignore) {
+            // 忽略资源加载错误，不影响核心逻辑
+        }
+
         // 更新游戏状态
         if (game.isGameOver()) {
             tvGameStatus.setText(game.getGameResult());
-        } else if (game.getCurrentPlayer() != null) {
-            String piece = game.getCurrentPlayer().equals(blackPlayer) ? "黑子" : "白子";
-            tvGameStatus.setText("当前回合: " + game.getCurrentPlayer() + " (" + piece + ")");
         } else {
-            tvGameStatus.setText("等待玩家加入...");
+            // 如果玩家不足两人，显示等待玩家加入
+            java.util.List<String> players = game.getPlayers();
+            if (players.size() < 2) {
+                tvGameStatus.setText("等待玩家加入...");
+            } else if (game.getCurrentPlayer() != null) {
+                String piece = game.getCurrentPlayer().equals(blackPlayer) ? "黑子" : "白子";
+                tvGameStatus.setText("当前回合: " + game.getCurrentPlayer() + " (" + piece + ")");
+            } else {
+                tvGameStatus.setText("等待玩家加入...");
+            }
         }
 
         // 更新棋盘

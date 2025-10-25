@@ -7,6 +7,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+// 使用布局中的 TextView 作为头像，不再需要 Bitmap/Canvas 导入
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -19,16 +20,17 @@ import org.json.JSONObject;
  * 井字棋游戏Activity
  */
 public class TicTacToeActivity extends AppCompatActivity {
-    
+
     public static final String EXTRA_GAME_ID = "game_id";
     public static final String EXTRA_USERNAME = "username";
     public static final String EXTRA_IS_SPECTATOR = "is_spectator";
     public static final String EXTRA_IS_SINGLE_PLAYER = "is_single_player";
-    
+
     private ImageButton[][] buttons = new ImageButton[3][3];
     private TextView tvGameStatus, tvPlayerX, tvPlayerO, tvSpectators;
+    private TextView ivPlayerXAvatar, ivPlayerOAvatar;
     private Button btnRestart, btnExit;
-    
+
     private String gameId;
     private String username;
     private boolean isSpectator;
@@ -36,28 +38,28 @@ public class TicTacToeActivity extends AppCompatActivity {
     private TicTacToeGame game;
     private GameManager gameManager;
     private Handler mainHandler;
-    
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tictactoe);
-        
-    // 获取传入参数
-    gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
-    username = getIntent().getStringExtra(EXTRA_USERNAME);
-    isSpectator = getIntent().getBooleanExtra(EXTRA_IS_SPECTATOR, false);
-    isSinglePlayer = getIntent().getBooleanExtra(EXTRA_IS_SINGLE_PLAYER, false);
-        
+
+        // 获取传入参数
+        gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
+        username = getIntent().getStringExtra(EXTRA_USERNAME);
+        isSpectator = getIntent().getBooleanExtra(EXTRA_IS_SPECTATOR, false);
+        isSinglePlayer = getIntent().getBooleanExtra(EXTRA_IS_SINGLE_PLAYER, false);
+
         mainHandler = new Handler(Looper.getMainLooper());
         gameManager = GameManager.getInstance();
         game = (TicTacToeGame) gameManager.getGame(gameId);
-        
+
         if (game == null) {
             Toast.makeText(this, "游戏不存在", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
-        
+
         initViews();
         setupListeners();
         updateUI();
@@ -71,27 +73,27 @@ public class TicTacToeActivity extends AppCompatActivity {
                 }
             }
         }
-        
+
         // 设置游戏状态监听器
         gameManager.setGameStateListener(gameId, new GameManager.GameStateListener() {
             @Override
             public void onGameStateChanged(String gameId, JSONObject gameState) {
                 mainHandler.post(() -> updateFromState(gameState));
             }
-            
+
             @Override
             public void onGameEnded(String gameId, String result) {
                 mainHandler.post(() -> {
                     showToast(result);
-                    
+
                     // 如果是发起者退出，自动关闭Activity
                     if (result.contains("发起者退出")) {
                         finish();
                         return;
                     }
-                    
+
                     updateUI();
-                    
+
                     // 如果是"已离开游戏"的通知，隐藏重新开始按钮
                     if (result.contains("已离开游戏")) {
                         btnRestart.setVisibility(Button.GONE);
@@ -105,15 +107,17 @@ public class TicTacToeActivity extends AppCompatActivity {
             }
         });
     }
-    
+
     private void initViews() {
         tvGameStatus = findViewById(R.id.tvGameStatus);
         tvPlayerX = findViewById(R.id.tvPlayerX);
         tvPlayerO = findViewById(R.id.tvPlayerO);
+        ivPlayerXAvatar = findViewById(R.id.ivPlayerXAvatar);
+        ivPlayerOAvatar = findViewById(R.id.ivPlayerOAvatar);
         tvSpectators = findViewById(R.id.tvSpectators);
         btnRestart = findViewById(R.id.btnRestart);
         btnExit = findViewById(R.id.btnExit);
-        
+
         // 初始化棋盘按钮
         buttons[0][0] = findViewById(R.id.btn_00);
         buttons[0][1] = findViewById(R.id.btn_01);
@@ -125,7 +129,7 @@ public class TicTacToeActivity extends AppCompatActivity {
         buttons[2][1] = findViewById(R.id.btn_21);
         buttons[2][2] = findViewById(R.id.btn_22);
     }
-    
+
     private void setupListeners() {
         // 设置棋盘按钮点击监听
         for (int i = 0; i < 3; i++) {
@@ -135,7 +139,7 @@ public class TicTacToeActivity extends AppCompatActivity {
                 buttons[i][j].setOnClickListener(v -> onCellClick(row, col));
             }
         }
-        
+
         // 重新开始按钮
         btnRestart.setOnClickListener(v -> {
             if (isSinglePlayer) {
@@ -162,41 +166,41 @@ public class TicTacToeActivity extends AppCompatActivity {
                 }
             }
         });
-        
+
         // 退出按钮
         btnExit.setOnClickListener(v -> finish());
     }
-    
+
     private void onCellClick(int row, int col) {
         if (isSpectator) {
             showToast("观战者不能操作");
             return;
         }
-        
+
         // 检查游戏是否已开始
         if (!game.canStart()) {
             showToast("等待玩家加入");
             return;
         }
-        
+
         // 检查当前玩家
         String currentPlayer = game.getCurrentPlayer();
         if (currentPlayer == null) {
             showToast("游戏尚未开始");
             return;
         }
-        
+
         if (!currentPlayer.equals(username)) {
             showToast("还没轮到你");
             return;
         }
-        
+
         // 创建移动数据
         try {
             JSONObject moveData = new JSONObject();
             moveData.put("row", row);
             moveData.put("col", col);
-            
+
             // 通过GameManager发送移动
             gameManager.sendGameMove(gameId, username, moveData);
 
@@ -237,9 +241,9 @@ public class TicTacToeActivity extends AppCompatActivity {
         String humanName = players.get(0);
         String humanPiece = game.getPlayerPiece(humanName);
 
-    java.util.Random rnd = new java.util.Random();
-    // 90% 概率使用最优策略，10% 随机策略
-    boolean useOptimal = rnd.nextInt(100) < 90;
+        java.util.Random rnd = new java.util.Random();
+        // 90% 概率使用最优策略，10% 随机策略
+        boolean useOptimal = rnd.nextInt(100) < 90;
 
         int bestRow = -1, bestCol = -1;
 
@@ -359,8 +363,10 @@ public class TicTacToeActivity extends AppCompatActivity {
             }
         }
         // 对角
-        if (!b[0][0].equals("") && b[0][0].equals(b[1][1]) && b[1][1].equals(b[2][2])) return b[0][0];
-        if (!b[0][2].equals("") && b[0][2].equals(b[1][1]) && b[1][1].equals(b[2][0])) return b[0][2];
+        if (!b[0][0].equals("") && b[0][0].equals(b[1][1]) && b[1][1].equals(b[2][2]))
+            return b[0][0];
+        if (!b[0][2].equals("") && b[0][2].equals(b[1][1]) && b[1][1].equals(b[2][0]))
+            return b[0][2];
 
         // 检查是否还有空位
         for (int i = 0; i < 3; i++) {
@@ -370,37 +376,69 @@ public class TicTacToeActivity extends AppCompatActivity {
         }
         return "DRAW";
     }
-    
+
     private void updateUI() {
         // 更新玩家信息
         java.util.List<String> players = game.getPlayers();
+        // 左侧：玩家 X，右侧：玩家 O（类似聊天布局）
         if (players.size() >= 1) {
-            tvPlayerX.setText("玩家X: " + players.get(0));
+            String p0 = players.get(0);
+            // 单机模式下，如果是 AI 名称以“电脑”开头，显示为 "电脑"
+            if (p0 != null && p0.startsWith("电脑")) p0 = "电脑";
+            tvPlayerX.setText("玩家X: " + (p0 != null ? p0 : ""));
         } else {
             tvPlayerX.setText("玩家X: ");
         }
         if (players.size() >= 2) {
-            tvPlayerO.setText("玩家O: " + players.get(1));
+            String p1 = players.get(1);
+            if (p1 != null && p1.startsWith("电脑")) p1 = "电脑";
+            tvPlayerO.setText("玩家O: " + (p1 != null ? p1 : ""));
         } else {
             tvPlayerO.setText("玩家O: ");
         }
-        
+
+        // 头像：使用布局中的 TextView，显示首字，AI 显示为“电”
+        try {
+            if (players.size() >= 1) {
+                String name0 = players.get(0);
+                String display = (name0 != null && name0.startsWith("电脑")) ? "电" : (name0 != null && !name0.isEmpty() ? String.valueOf(name0.charAt(0)) : "?");
+                ivPlayerXAvatar.setText(display);
+            } else {
+                ivPlayerXAvatar.setText("");
+            }
+
+            if (players.size() >= 2) {
+                String name1 = players.get(1);
+                String display1 = (name1 != null && name1.startsWith("电脑")) ? "电" : (name1 != null && !name1.isEmpty() ? String.valueOf(name1.charAt(0)) : "?");
+                ivPlayerOAvatar.setText(display1);
+            } else {
+                ivPlayerOAvatar.setText("");
+            }
+        } catch (Exception ignore) {
+            // 忽略资源加载错误
+        }
+
         // 更新游戏状态
         if (game.isGameOver()) {
             tvGameStatus.setText(game.getGameResult());
-        } else if (game.getCurrentPlayer() != null) {
-            String currentPiece = game.getPlayerPiece(game.getCurrentPlayer());
-            tvGameStatus.setText("当前回合: " + game.getCurrentPlayer() + " (" + currentPiece + ")");
         } else {
-            tvGameStatus.setText("等待玩家加入...");
+            // 与 Gobang 行为一致：玩家不足两人时显示等待提示
+            if (players.size() < 2) {
+                tvGameStatus.setText("等待玩家加入...");
+            } else if (game.getCurrentPlayer() != null) {
+                String currentPiece = game.getPlayerPiece(game.getCurrentPlayer());
+                tvGameStatus.setText("当前回合: " + game.getCurrentPlayer() + " (" + currentPiece + ")");
+            } else {
+                tvGameStatus.setText("等待玩家加入...");
+            }
         }
-        
+
         // 更新棋盘
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 String piece = game.getPiece(i, j);
                 ImageButton button = buttons[i][j];
-                
+
                 if (piece.equals("X")) {
                     button.setImageResource(R.drawable.blue_x);
                 } else if (piece.equals("O")) {
@@ -408,12 +446,12 @@ public class TicTacToeActivity extends AppCompatActivity {
                 } else {
                     button.setImageResource(0);
                 }
-                
+
                 // 观战者和游戏结束时禁用按钮
                 button.setEnabled(!isSpectator && !game.isGameOver());
             }
         }
-        
+
         // 更新观战者列表
         java.util.List<String> spectators = game.getSpectators();
         if (!spectators.isEmpty()) {
@@ -423,11 +461,11 @@ public class TicTacToeActivity extends AppCompatActivity {
             tvSpectators.setVisibility(TextView.GONE);
         }
     }
-    
+
     private void updateFromState(JSONObject state) {
         game.setGameState(state);
         updateUI();
-        
+
         // 如果游戏重新开始了（不是游戏结束状态），隐藏重新开始按钮
         if (!game.isGameOver()) {
             btnRestart.setVisibility(Button.GONE);
@@ -445,11 +483,11 @@ public class TicTacToeActivity extends AppCompatActivity {
             }
         }
     }
-    
+
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
-    
+
     @Override
     protected void onDestroy() {
         super.onDestroy();

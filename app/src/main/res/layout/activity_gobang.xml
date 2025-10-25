@@ -12,72 +12,119 @@
         android:gravity="center"
         android:padding="16dp">
 
-        <!-- 游戏信息头部 -->
+        <!-- 标题与状态：与井字棋保持一致，独立显示在卡片上方 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@color/cardBackground"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp"
-            android:elevation="4dp">
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="6dp"
+            android:translationY="-12dp"
+            android:minHeight="72dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="10dp">
 
             <TextView
                 android:id="@+id/tvGameTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="五子棋对战"
-                android:textSize="20sp"
-                android:textStyle="bold"
                 android:textColor="@color/textPrimary"
-                android:layout_gravity="center" />
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGameStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="等待玩家加入..."
-                android:textSize="16sp"
                 android:textColor="@color/textSecondary"
-                android:layout_gravity="center"
-                android:layout_marginTop="8dp" />
+                android:textSize="17sp" />
 
+        </LinearLayout>
+
+        <!-- 游戏信息卡片（包含玩家信息） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/cardBackground"
+            android:paddingTop="12dp"
+            android:paddingBottom="20dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginBottom="8dp"
+            android:elevation="4dp">
+
+            <!-- 玩家信息：左（黑方）和右（白方）各自带头像 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="12dp">
+                android:layout_marginTop="20dp">
 
-                <TextView
-                    android:id="@+id/tvBlackPlayer"
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="黑方: "
-                    android:textSize="14sp"
-                    android:textColor="@color/textPrimary"
-                    android:gravity="center" />
+                    android:orientation="horizontal"
+                    android:gravity="start|center_vertical">
 
-                <TextView
-                    android:id="@+id/tvWhitePlayer"
+                    <TextView
+                        android:id="@+id/ivBlackAvatar"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:gravity="center"
+                        android:text=""
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:padding="0dp" />
+
+                    <TextView
+                        android:id="@+id/tvBlackPlayer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="黑方: "
+                        android:textSize="12sp"
+                        android:textColor="@color/textPrimary" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="白方: "
-                    android:textSize="14sp"
-                    android:textColor="@color/textPrimary"
-                    android:gravity="center" />
+                    android:orientation="horizontal"
+                    android:gravity="end|center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvWhitePlayer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="白方: "
+                        android:textSize="12sp"
+                        android:textColor="@color/textPrimary" />
+
+                    <TextView
+                        android:id="@+id/ivWhiteAvatar"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:gravity="center"
+                        android:text=""
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:padding="0dp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvSpectators"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="观战者: "
-                android:textSize="12sp"
-                android:textColor="@color/textTertiary"
-                android:layout_gravity="center"
-                android:layout_marginTop="8dp" />
+            <!-- 观战者列表（已移到棋盘下方，见文件底部） -->
+
         </LinearLayout>
 
         <!-- 棋盘 -->
@@ -87,6 +134,17 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_marginBottom="16dp" />
+
+    <!-- 观战者列表：放在棋盘下方、按钮上方，与井字棋一致 -->
+    <TextView
+        android:id="@+id/tvSpectators"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="观战者: "
+        android:textColor="@color/textSecondary"
+        android:textSize="14sp"
+        android:visibility="gone" />
 
         <!-- 按钮区域 -->
         <LinearLayout
