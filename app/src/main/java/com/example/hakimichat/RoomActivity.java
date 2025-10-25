@@ -1379,6 +1379,8 @@ public class RoomActivity extends AppCompatActivity {
         // 五子棋选择颜色
         if ("Gobang".equals(gameType)) {
             showColorSelectionDialog(gameType);
+        } else if ("Chess".equals(gameType)) {
+            showColorSelectionDialog(gameType);
         } else {
             // 其他游戏直接创建
             createSinglePlayerGameWithColor(gameType, true); // true表示玩家是先手
@@ -1386,15 +1388,22 @@ public class RoomActivity extends AppCompatActivity {
     }
     
     /**
-     * 显示颜色选择对话框（黑子/白子）- 用于五子棋
+     * 显示颜色选择对话框（黑子/白子）- 用于五子棋和国际象棋
      */
     private void showColorSelectionDialog(String gameType) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle("选择你的棋子");
-        String[] options = {"黑子（先手）", "白子（后手）"};
+        String[] options;
+        if ("Gobang".equals(gameType)) {
+            options = new String[]{"黑子（先手）", "白子（后手）"};
+        } else if ("Chess".equals(gameType)) {
+            options = new String[]{"白子（先手）", "黑子（后手）"};
+        } else {
+            options = new String[]{"X（先手）", "O（后手）"};
+        }
         builder.setItems(options, (dialog, which) -> {
-            boolean playerIsBlack = (which == 0);
-            createSinglePlayerGameWithColor(gameType, playerIsBlack);
+            boolean playerIsFirst = (which == 0);
+            createSinglePlayerGameWithColor(gameType, playerIsFirst);
         });
         builder.setNegativeButton("取消", null);
         builder.show();
@@ -1437,6 +1446,8 @@ public class RoomActivity extends AppCompatActivity {
         // 在添加玩家之前先设置AI模式，防止随机黑白方逻辑生效
         if (game instanceof com.example.hakimichat.game.GobangGame) {
             ((com.example.hakimichat.game.GobangGame) game).setAiMode(true, username);
+        } else if (game instanceof com.example.hakimichat.game.ChessGame) {
+            ((com.example.hakimichat.game.ChessGame) game).setAiMode(true, username);
         }
 
         // 根据玩家选择的颜色/符号决定加入顺序
@@ -1518,7 +1529,8 @@ public class RoomActivity extends AppCompatActivity {
         
         // 根据gameType获取游戏名称
         String gameName = "TicTacToe".equals(gameType) ? "井字棋" : 
-                          "Gobang".equals(gameType) ? "五子棋" : gameType;
+                          "Gobang".equals(gameType) ? "五子棋" :
+                          "Chess".equals(gameType) ? "国际象棋" : gameType;
         
         builder.setTitle("游戏邀请");
         builder.setMessage(sender + " 邀请你一起玩" + gameName + "，是否接受？");
@@ -1632,6 +1644,8 @@ public class RoomActivity extends AppCompatActivity {
         Class<?> activityClass;
         if ("Gobang".equals(gameType)) {
             activityClass = com.example.hakimichat.game.GobangActivity.class;
+        } else if ("Chess".equals(gameType)) {
+            activityClass = com.example.hakimichat.game.ChessActivity.class;
         } else {
             activityClass = com.example.hakimichat.game.TicTacToeActivity.class;
         }

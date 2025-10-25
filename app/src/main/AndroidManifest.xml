@@ -47,6 +47,12 @@
             android:label="五子棋"
             android:parentActivityName=".RoomActivity"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".game.ChessActivity"
+            android:exported="false"
+            android:label="国际象棋"
+            android:parentActivityName=".RoomActivity"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

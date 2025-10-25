@@ -211,10 +211,32 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         void bind(Message message) {
+            // 设置游戏图标
+            String gameType = message.getGameType();
+            int iconResId;
+            if ("TicTacToe".equals(gameType)) {
+                iconResId = R.drawable.ic_tictactoe;
+            } else if ("Gobang".equals(gameType)) {
+                iconResId = R.drawable.ic_gobang;
+            } else if ("Chess".equals(gameType)) {
+                iconResId = R.drawable.ic_chess;
+            } else {
+                iconResId = R.drawable.ic_game; // 默认图标
+            }
+            ivGameIcon.setImageResource(iconResId);
+            
             // 设置游戏名称
             String gameName = message.getGameName();
             if (gameName == null || gameName.isEmpty()) {
-                gameName = "TicTacToe".equals(message.getGameType()) ? "井字棋" : message.getGameType();
+                if ("TicTacToe".equals(gameType)) {
+                    gameName = "井字棋";
+                } else if ("Gobang".equals(gameType)) {
+                    gameName = "五子棋";
+                } else if ("Chess".equals(gameType)) {
+                    gameName = "国际象棋";
+                } else {
+                    gameName = gameType;
+                }
             }
             tvGameName.setText(gameName);
 

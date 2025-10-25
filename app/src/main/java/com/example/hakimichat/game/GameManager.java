@@ -72,6 +72,8 @@ public class GameManager {
             game = new TicTacToeGame();
         } else if ("Gobang".equals(gameType)) {
             game = new GobangGame();
+        } else if ("Chess".equals(gameType)) {
+            game = new ChessGame();
         }
         // 未来可以在这里添加更多游戏类型
         
@@ -92,6 +94,8 @@ public class GameManager {
             game = new TicTacToeGame();
         } else if ("Gobang".equals(gameType)) {
             game = new GobangGame();
+        } else if ("Chess".equals(gameType)) {
+            game = new ChessGame();
         }
         // 未来可以在这里添加更多游戏类型
         

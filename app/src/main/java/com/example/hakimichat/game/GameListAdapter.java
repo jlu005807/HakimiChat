@@ -61,6 +61,14 @@ public class GameListAdapter extends RecyclerView.Adapter<GameListAdapter.GameVi
             dummyGobang.getGameIcon()
         ));
         
+        ChessGame dummyChess = new ChessGame();
+        games.add(new GameInfo(
+            dummyChess.getGameType(),
+            dummyChess.getGameName(),
+            dummyChess.getGameDescription(),
+            dummyChess.getGameIcon()
+        ));
+        
         // 未来可以在这里添加更多游戏
     }
     
