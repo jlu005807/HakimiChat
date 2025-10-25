@@ -372,18 +372,18 @@ public class ChessBoardView extends View {
     }
 
     private void movePiece(int fromRow, int fromCol, int toRow, int toCol) {
-        ChessPiece moving = board[fromRow][fromCol];
-        ChessPiece captured = board[toRow][toCol];
-        lastMove = new Move(fromRow, fromCol, toRow, toCol, moving, captured);
-        board[toRow][toCol] = moving;
-        board[fromRow][fromCol] = new ChessPiece(ChessPiece.EMPTY, ChessPiece.WHITE);
-        moving.setMoved(true);
-        currentPlayer = (currentPlayer == ChessPiece.WHITE) ? ChessPiece.BLACK : ChessPiece.WHITE;
+        // 不在视图层直接修改棋局状态，改为将移动意图通知 Activity
+        // 由 Activity 通过 GameManager 发起网络/本地的状态变更，随后通过
+        // GameStateListener 同步回到视图（避免本地-远端重复执行移动导致的不同步/逻辑错误）
         if (callback != null) {
             callback.onPieceMoved(fromRow, fromCol, toRow, toCol);
-            callback.onPlayerChanged(currentPlayer);
-            checkGameStatus();
         }
+
+        // 清理选中和可能移动集合，等待来自 GameManager 的状态更新
+        selectedRow = -1;
+        selectedCol = -1;
+        possibleMoves.clear();
+        invalidate();
     }
 
     public void undoMove() {

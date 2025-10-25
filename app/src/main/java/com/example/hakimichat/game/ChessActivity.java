@@ -20,8 +20,6 @@ public class ChessActivity extends AppCompatActivity {
     public static final String EXTRA_GAME_ID = "game_id";
     public static final String EXTRA_USERNAME = "username";
     public static final String EXTRA_IS_SPECTATOR = "is_spectator";
-    public static final String EXTRA_IS_SINGLE_PLAYER = "is_single_player";
-
     private ChessBoardView boardView;
     private TextView tvGameStatus, tvWhitePlayer, tvBlackPlayer, tvSpectators;
     private TextView ivWhiteAvatar, ivBlackAvatar;
@@ -30,7 +28,6 @@ public class ChessActivity extends AppCompatActivity {
     private String gameId;
     private String username;
     private boolean isSpectator;
-    private boolean isSinglePlayer;
     private ChessGame game;
     private GameManager gameManager;
     private Handler mainHandler;
@@ -40,11 +37,10 @@ public class ChessActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chess);
 
-        // 获取传入参数
-        gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
-        username = getIntent().getStringExtra(EXTRA_USERNAME);
-        isSpectator = getIntent().getBooleanExtra(EXTRA_IS_SPECTATOR, false);
-        isSinglePlayer = getIntent().getBooleanExtra(EXTRA_IS_SINGLE_PLAYER, false);
+    // 获取传入参数
+    gameId = getIntent().getStringExtra(EXTRA_GAME_ID);
+    username = getIntent().getStringExtra(EXTRA_USERNAME);
+    isSpectator = getIntent().getBooleanExtra(EXTRA_IS_SPECTATOR, false);
 
         mainHandler = new Handler(Looper.getMainLooper());
         gameManager = GameManager.getInstance();
@@ -70,13 +66,6 @@ public class ChessActivity extends AppCompatActivity {
             return;
         }
 
-        // 如果是单机模式且轮到AI先手，触发AI移动
-        if (isSinglePlayer && game.canStart()) {
-            String currentPlayer = game.getCurrentPlayer();
-            if (currentPlayer != null && !currentPlayer.equals(username)) {
-                mainHandler.postDelayed(this::performAIMove, 500);
-            }
-        }
 
         // 设置游戏状态监听器
         gameManager.setGameStateListener(gameId, new GameManager.GameStateListener() {
@@ -146,17 +135,7 @@ public class ChessActivity extends AppCompatActivity {
 
     private void setupListeners() {
         btnUndo.setOnClickListener(v -> {
-            if (isSpectator) {
-                showToast("观战者不能悔棋");
-                return;
-            }
-            if (!isSinglePlayer) {
-                showToast("多人游戏不支持悔棋");
-                return;
-            }
-            // 单机模式下悔棋
-            boardView.undoMove();
-            updateUI();
+            showToast("当前不支持悔棋");
         });
 
         btnRestart.setOnClickListener(v -> {
@@ -164,17 +143,14 @@ public class ChessActivity extends AppCompatActivity {
                 showToast("观战者不能重新开始");
                 return;
             }
-            if (isSinglePlayer) {
-                // 单机模式：只在本地重置
+            // 尝试通过 GameManager 请求重启（多人场景）
+            if (gameManager.canRestartGame(gameId, username)) {
+                gameManager.restartGame(gameId);
+            } else {
+                // 无法通过网络重启时，回退到本地重置（方便调试）
                 boardView.restartGame();
                 updateUI();
-            } else {
-                // 多人模式：发送重新开始请求
-                if (gameManager.canRestartGame(gameId, username)) {
-                    gameManager.restartGame(gameId);
-                } else {
-                    showToast("只有玩家可以重新开始游戏");
-                }
+                btnRestart.setVisibility(Button.GONE);
             }
         });
 
@@ -205,48 +181,6 @@ public class ChessActivity extends AppCompatActivity {
         gameManager.sendGameMove(gameId, username, moveData);
     }
 
-    private void performAIMove() {
-        // 简单的AI实现：随机移动
-        // 这里可以实现更复杂的AI逻辑
-        // 暂时使用随机移动作为占位符
-        try {
-            // 获取所有可能的移动
-            java.util.List<int[]> possibleMoves = getPossibleMoves();
-            if (!possibleMoves.isEmpty()) {
-                // 随机选择一个移动
-                java.util.Random random = new java.util.Random();
-                int[] move = possibleMoves.get(random.nextInt(possibleMoves.size()));
-
-                JSONObject moveData = new JSONObject();
-                moveData.put("fromRow", move[0]);
-                moveData.put("fromCol", move[1]);
-                moveData.put("toRow", move[2]);
-                moveData.put("toCol", move[3]);
-
-                gameManager.sendGameMove(gameId, game.getCurrentPlayer(), moveData);
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private java.util.List<int[]> getPossibleMoves() {
-        java.util.List<int[]> moves = new java.util.ArrayList<>();
-        // 简化实现：返回一些可能的移动
-        // 这里应该实现真正的国际象棋移动规则
-        for (int fromRow = 0; fromRow < 8; fromRow++) {
-            for (int fromCol = 0; fromCol < 8; fromCol++) {
-                for (int toRow = 0; toRow < 8; toRow++) {
-                    for (int toCol = 0; toCol < 8; toCol++) {
-                        if (Math.abs(fromRow - toRow) <= 2 && Math.abs(fromCol - toCol) <= 2) {
-                            moves.add(new int[]{fromRow, fromCol, toRow, toCol});
-                        }
-                    }
-                }
-            }
-        }
-        return moves;
-    }
 
     private void updateUI() {
         if (game == null) return;
@@ -307,8 +241,9 @@ public class ChessActivity extends AppCompatActivity {
             btnUndo.setEnabled(false);
             btnRestart.setEnabled(false);
         } else {
-            btnUndo.setEnabled(isSinglePlayer);
-            btnRestart.setEnabled(isSinglePlayer);
+            // 始终隐藏/禁用悔棋按钮（多人模式下不支持）
+            btnUndo.setVisibility(android.view.View.GONE);
+            btnRestart.setEnabled(true);
         }
     }
 
@@ -328,6 +263,17 @@ public class ChessActivity extends AppCompatActivity {
         super.onDestroy();
         if (gameManager != null && gameId != null) {
             gameManager.removeGameStateListener(gameId);
+
+            if (game != null) {
+                if (isSpectator) {
+                    // 观战者退出 - 更新本地并广播状态让其他人知道
+                    game.removeSpectator(username);
+                    gameManager.broadcastGameState(gameId);
+                } else {
+                    // 玩家退出 - 通知 GameManager（会在服务器端/房间内广播并统一处理）
+                    gameManager.quitGame(gameId, username);
+                }
+            }
         }
     }
 }

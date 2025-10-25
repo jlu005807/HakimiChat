@@ -39,10 +39,7 @@ public class ChessGame extends BaseGame {
     private String whitePlayerName;
     private String blackPlayerName;
 
-    private boolean isAiEnabled = false;
     private boolean isStrictMode = false;
-    private int humanPlayerColor = WHITE;
-    private String humanPlayerName = null;
 
     private final Stack<Move> moveHistory = new Stack<>();
 
@@ -145,25 +142,14 @@ public class ChessGame extends BaseGame {
                 blackPlayerName = player;
                 isGameStarted = true;
 
-                // 如果不是AI模式（真人对战），随机决定谁是白方
-                if (!isAiEnabled) {
-                    java.util.Random random = new java.util.Random();
-                    if (random.nextBoolean()) {
-                        // 交换黑白方
-                        String temp = whitePlayerName;
-                        whitePlayerName = blackPlayerName;
-                        blackPlayerName = temp;
-                        currentPlayer = whitePlayerName;
-                    }
-                } else {
-                    // AI模式：现在可以确定humanPlayerColor了
-                    if (humanPlayerName != null) {
-                        if (humanPlayerName.equals(whitePlayerName)) {
-                            this.humanPlayerColor = WHITE;
-                        } else {
-                            this.humanPlayerColor = BLACK;
-                        }
-                    }
+                // 随机决定谁是白方（真人对战）
+                java.util.Random random = new java.util.Random();
+                if (random.nextBoolean()) {
+                    // 交换黑白方
+                    String temp = whitePlayerName;
+                    whitePlayerName = blackPlayerName;
+                    blackPlayerName = temp;
+                    currentPlayer = whitePlayerName;
                 }
             }
             return true;
@@ -171,16 +157,7 @@ public class ChessGame extends BaseGame {
         return false;
     }
 
-    public void setAiMode(boolean isAi, String humanPlayer) {
-        this.isAiEnabled = isAi;
-        if (isAi) {
-            this.humanPlayerName = humanPlayer;
-        }
-    }
-
-    public boolean isAiEnabled() {
-        return isAiEnabled;
-    }
+    // 人机模式已从国际象棋移除
 
     public String getWhitePlayerName() {
         return whitePlayerName;
@@ -260,16 +237,19 @@ public class ChessGame extends BaseGame {
         }
 
         ChessPiece piece = board[fromRow][fromCol];
-        if (piece.getType() == EMPTY || piece.getColor() != turnColor) {
+        // 不再依赖全局的 turnColor 字段来判断棋子颜色，
+        // 以便在检测对手的将军/僵局时也能正确判断合法移动
+        if (piece.getType() == EMPTY) {
             return false;
         }
 
         ChessPiece targetPiece = board[toRow][toCol];
-        if (targetPiece.getType() != EMPTY && targetPiece.getColor() == turnColor) {
+        // 目标位置如果有己方棋子则不可走（比较的是移动棋子的颜色）
+        if (targetPiece.getType() != EMPTY && targetPiece.getColor() == piece.getColor()) {
             return false;
         }
 
-        // 检查具体棋子的移动规则
+        // 检查具体棋子的移动规则（具体规则会基于棋子颜色自身来判断，例如兵的前进方向）
         return isValidPieceMove(piece.getType(), fromRow, fromCol, toRow, toCol);
     }
 
@@ -436,7 +416,9 @@ public class ChessGame extends BaseGame {
     public JSONObject getGameState() {
         JSONObject state = new JSONObject();
         try {
+            state.put("gameId", gameId);
             state.put("gameType", getGameType());
+            state.put("isGameStarted", isGameStarted);
             state.put("moveCount", moveCount);
             state.put("turnColor", turnColor);
             state.put("isGameOver", isGameOver);
@@ -444,9 +426,8 @@ public class ChessGame extends BaseGame {
             state.put("currentPlayer", currentPlayer);
             state.put("whitePlayerName", whitePlayerName);
             state.put("blackPlayerName", blackPlayerName);
-            state.put("isAiEnabled", isAiEnabled);
-            state.put("humanPlayerName", humanPlayerName);
-            state.put("humanPlayerColor", humanPlayerColor);
+            state.put("players", playersToJson());
+            state.put("spectators", spectatorsToJson());
 
             // 序列化棋盘
             JSONArray boardArray = new JSONArray();
@@ -486,6 +467,8 @@ public class ChessGame extends BaseGame {
     @Override
     public void setGameState(JSONObject state) {
         try {
+            this.gameId = state.optString("gameId", this.gameId);
+            this.isGameStarted = state.optBoolean("isGameStarted", this.isGameStarted);
             moveCount = state.getInt("moveCount");
             turnColor = state.getInt("turnColor");
             isGameOver = state.getBoolean("isGameOver");
@@ -493,9 +476,9 @@ public class ChessGame extends BaseGame {
             currentPlayer = state.optString("currentPlayer", null);
             whitePlayerName = state.optString("whitePlayerName", null);
             blackPlayerName = state.optString("blackPlayerName", null);
-            isAiEnabled = state.optBoolean("isAiEnabled", false);
-            humanPlayerName = state.optString("humanPlayerName", null);
-            humanPlayerColor = state.optInt("humanPlayerColor", WHITE);
+            // 恢复玩家/观战者列表
+            if (state.has("players")) playersFromJson(state.getJSONArray("players"));
+            if (state.has("spectators")) spectatorsFromJson(state.getJSONArray("spectators"));
 
             // 反序列化棋盘
             JSONArray boardArray = state.getJSONArray("board");
@@ -526,6 +509,9 @@ public class ChessGame extends BaseGame {
                 Move move = new Move(fromRow, fromCol, toRow, toCol, capturedPiece);
                 moveHistory.push(move);
             }
+
+            // 根据 moveCount 推断回合（保证视图与游戏逻辑一致）
+            this.turnColor = (this.moveCount % 2 == 0) ? WHITE : BLACK;
 
         } catch (JSONException e) {
             e.printStackTrace();

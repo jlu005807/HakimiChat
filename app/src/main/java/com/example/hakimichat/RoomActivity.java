@@ -293,9 +293,11 @@ public class RoomActivity extends AppCompatActivity {
         recyclerViewGamePanel.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
         com.example.hakimichat.game.GameListAdapter gamePanelAdapter = 
             new com.example.hakimichat.game.GameListAdapter(gameInfo -> {
-                // 点击游戏后，隐藏面板并显示玩家选择对话框
-                hideGamePanel();
-                showPlayerSelectionDialog(gameInfo);
+                // 点击游戏后，先尝试显示玩家选择对话框，只有在成功展示/启动后再隐藏游戏面板
+                boolean launched = showPlayerSelectionDialog(gameInfo);
+                if (launched) {
+                    hideGamePanel();
+                }
             });
         recyclerViewGamePanel.setAdapter(gamePanelAdapter);
         
@@ -1331,36 +1333,48 @@ public class RoomActivity extends AppCompatActivity {
     
     /**
      * 显示玩家选择对话框（邀请谁一起玩）
+     * @return true 如果已经展示/启动了玩家选择或单机流程（表示可以隐藏游戏面板）；
+     *         false 如果没有任何后续操作（例如国际象棋在房间只有自己时）
      */
-    private void showPlayerSelectionDialog(com.example.hakimichat.game.GameListAdapter.GameInfo gameInfo) {
+    private boolean showPlayerSelectionDialog(com.example.hakimichat.game.GameListAdapter.GameInfo gameInfo) {
         // 获取房间成员列表（除了自己）
         java.util.List<String> availablePlayers = new java.util.ArrayList<>(memberList);
         availablePlayers.remove(username);
         
         if (availablePlayers.isEmpty()) {
-            // 提示并自动进入单机模式
+            // 如果是国际象棋，提示仅支持双人并返回；其他游戏仍可以进入单机模式
+            if ("Chess".equals(gameInfo.gameType)) {
+                showToast("当前游戏仅支持双人对战");
+                return false;
+            }
+
+            // 提示并自动进入单机模式（针对支持单机的人机对战的游戏）
             showToast("房间里没有其他玩家，进入单机模式吧！");
             // 延迟一点再进入，保证 Toast 可见
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                 createSinglePlayerGame(gameInfo.gameType);
             }, 400);
-            return;
+            return true;
         }
         
-        // 添加"所有人"选项，以及最后添加一个"单机（人机对战）"选项
-        String[] playerOptions = new String[availablePlayers.size() + 2];
+        // 添加"所有人"选项，若游戏支持单机（人机对战）再添加单机选项
+        boolean supportsSinglePlayer = !"Chess".equals(gameInfo.gameType);
+        int extra = supportsSinglePlayer ? 2 : 1; // 1 for "所有人" + players, +1 for 单机
+        String[] playerOptions = new String[availablePlayers.size() + extra];
         playerOptions[0] = "所有人（谁先加入谁玩）";
         for (int i = 0; i < availablePlayers.size(); i++) {
             playerOptions[i + 1] = availablePlayers.get(i);
         }
-        // 最后一个选项为单机
-        playerOptions[playerOptions.length - 1] = "单机（人机对战）";
-        
+        if (supportsSinglePlayer) {
+            // 最后一个选项为单机（仅对支持的游戏显示）
+            playerOptions[playerOptions.length - 1] = "单机（人机对战）";
+        }
+
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle("邀请谁一起玩" + gameInfo.gameName + "?");
         builder.setItems(playerOptions, (dialog, which) -> {
-            // 如果选择最后一个，启动单机模式
-            if (which == playerOptions.length - 1) {
+            // 如果选择最后一个且该游戏支持单机，启动单机模式
+            if (supportsSinglePlayer && which == playerOptions.length - 1) {
                 createSinglePlayerGame(gameInfo.gameType);
                 return;
             }
@@ -1370,6 +1384,7 @@ public class RoomActivity extends AppCompatActivity {
         });
         builder.setNegativeButton("取消", null);
         builder.show();
+        return true;
     }
 
     /**
@@ -1446,8 +1461,6 @@ public class RoomActivity extends AppCompatActivity {
         // 在添加玩家之前先设置AI模式，防止随机黑白方逻辑生效
         if (game instanceof com.example.hakimichat.game.GobangGame) {
             ((com.example.hakimichat.game.GobangGame) game).setAiMode(true, username);
-        } else if (game instanceof com.example.hakimichat.game.ChessGame) {
-            ((com.example.hakimichat.game.ChessGame) game).setAiMode(true, username);
         }
 
         // 根据玩家选择的颜色/符号决定加入顺序
