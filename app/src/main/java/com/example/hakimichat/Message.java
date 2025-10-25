@@ -23,6 +23,7 @@ public class Message implements Serializable {
     public static final int TYPE_GAME_SPECTATE = 12; // 观战请求
     public static final int TYPE_GAME_QUIT = 13;     // 退出游戏
     public static final int TYPE_GAME_RESTART = 14;  // 再来一局
+    public static final int TYPE_GAME_EMOJI = 15;    // 游戏表情
     
     private String sender;
     private String content;
@@ -376,6 +377,19 @@ public class Message implements Serializable {
         Message message = new Message(sender, "发起了再来一局");
         message.messageType = TYPE_GAME_RESTART;
         message.gameId = gameId;
+        return message;
+    }
+
+    /**
+     * 创建游戏表情消息
+     */
+    public static Message createGameEmojiMessage(String sender, String gameId, String emoji) {
+        // 不在 content 填写可见文本，避免被误加入聊天展示
+        Message message = new Message(sender, "");
+        message.messageType = TYPE_GAME_EMOJI;
+        message.gameId = gameId;
+        // 将 emoji 放到 gameData 字段（JSON格式）
+        message.gameData = "{\"emoji\":\"" + emoji + "\"}";
         return message;
     }
 }

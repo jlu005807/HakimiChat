@@ -760,6 +760,9 @@ public class RoomActivity extends AppCompatActivity {
                     } else if (message.getMessageType() == Message.TYPE_GAME_MOVE) {
                         // 游戏移动消息
                         gameManager.handleGameMove(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_EMOJI) {
+                        // 游戏表情消息：只处理游戏事件，不在聊天区显示系统提示
+                        gameManager.handleGameEmoji(message);
                     } else if (message.getMessageType() == Message.TYPE_GAME_STATE) {
                         // 游戏状态同步消息
                         gameManager.handleGameState(message);
@@ -893,6 +896,9 @@ public class RoomActivity extends AppCompatActivity {
                     } else if (message.getMessageType() == Message.TYPE_GAME_MOVE) {
                         // 游戏移动消息
                         gameManager.handleGameMove(message);
+                    } else if (message.getMessageType() == Message.TYPE_GAME_EMOJI) {
+                        // 游戏表情消息：只处理游戏事件，不在聊天区显示系统提示
+                        gameManager.handleGameEmoji(message);
                     } else if (message.getMessageType() == Message.TYPE_GAME_STATE) {
                         // 游戏状态同步消息
                         gameManager.handleGameState(message);

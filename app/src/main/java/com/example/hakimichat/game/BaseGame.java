@@ -5,6 +5,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 游戏基类 - 提供通用的游戏功能实现
@@ -18,6 +20,8 @@ public abstract class BaseGame implements Game {
     protected boolean isGameOver;
     protected String currentPlayer;
     protected String gameResult;
+    // 存储本局每位玩家/观战者最后一次发送的表情（局内有效，局重置时清空）
+    protected Map<String, String> lastEmojiMap;
     
     public BaseGame() {
         this.gameId = UUID.randomUUID().toString();
@@ -25,6 +29,7 @@ public abstract class BaseGame implements Game {
         this.spectators = new ArrayList<>();
         this.isGameStarted = false;
         this.isGameOver = false;
+        this.lastEmojiMap = new HashMap<>();
     }
     
     public String getGameId() {
@@ -157,5 +162,23 @@ public abstract class BaseGame implements Game {
         isGameOver = false;
         gameResult = null;
         currentPlayer = null;
+        // 重置本局表情缓存
+        if (lastEmojiMap != null) lastEmojiMap.clear();
+    }
+
+    /**
+     * 设置玩家/观战者在本局发送的最后表情
+     */
+    public void setLastEmoji(String user, String emoji) {
+        if (lastEmojiMap == null) lastEmojiMap = new HashMap<>();
+        lastEmojiMap.put(user, emoji);
+    }
+
+    /**
+     * 获取玩家/观战者在本局发送的最后表情
+     */
+    public String getLastEmoji(String user) {
+        if (lastEmojiMap == null) return null;
+        return lastEmojiMap.get(user);
     }
 }

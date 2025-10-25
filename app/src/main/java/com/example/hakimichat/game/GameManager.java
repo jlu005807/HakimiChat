@@ -378,6 +378,52 @@ public class GameManager {
             }
         }
     }
+
+    /**
+     * 发送游戏表情（会广播到其他玩家并立即本地处理）
+     */
+    public void sendGameEmoji(String gameId, String sender, String emoji) {
+        Message emojiMsg = Message.createGameEmojiMessage(sender, gameId, emoji);
+        sendMessage(emojiMsg);
+        // 立即本地处理，room 的消息接收路径不会分发回发送者
+        handleGameEmoji(emojiMsg);
+    }
+
+    /**
+     * 处理收到的游戏表情消息（本地或远程）
+     */
+    public void handleGameEmoji(Message message) {
+        String gameId = message.getGameId();
+        String sender = message.getSender();
+        String emoji = null;
+        try {
+            if (message.getGameData() != null) {
+                org.json.JSONObject j = new org.json.JSONObject(message.getGameData());
+                emoji = j.optString("emoji", null);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (emoji == null) return;
+
+        // 构造一个临时的 gameState JSON，包含 emojiEvent 字段，供 Activity 监听并显示
+        try {
+            org.json.JSONObject evt = new org.json.JSONObject();
+            org.json.JSONObject data = new org.json.JSONObject();
+            data.put("sender", sender);
+            data.put("emoji", emoji);
+            evt.put("emojiEvent", data);
+
+            // 通知本地游戏界面监听器
+            GameStateListener listener = gameStateListeners.get(gameId);
+            if (listener != null) {
+                listener.onGameStateChanged(gameId, evt);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     
     /**
      * 重新开始游戏

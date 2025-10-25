@@ -7,6 +7,11 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.Color;
 // 使用布局中的 TextView 作为头像，不再需要 Bitmap/Canvas 导入
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -30,6 +35,8 @@ public class TicTacToeActivity extends AppCompatActivity {
     private TextView tvGameStatus, tvPlayerX, tvPlayerO, tvSpectators;
     private TextView ivPlayerXAvatar, ivPlayerOAvatar;
     private Button btnRestart, btnExit;
+    private Button btnEmoji;
+    private View emojiPalette; // now refers to the inner palette row (emojiPaletteInner)
 
     private String gameId;
     private String username;
@@ -38,6 +45,8 @@ public class TicTacToeActivity extends AppCompatActivity {
     private TicTacToeGame game;
     private GameManager gameManager;
     private Handler mainHandler;
+    // 用于管理临时气泡
+    private int prevMoveCount = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,7 +87,23 @@ public class TicTacToeActivity extends AppCompatActivity {
         gameManager.setGameStateListener(gameId, new GameManager.GameStateListener() {
             @Override
             public void onGameStateChanged(String gameId, JSONObject gameState) {
-                mainHandler.post(() -> updateFromState(gameState));
+                        mainHandler.post(() -> {
+                            // 支持 emojiEvent：优先处理表情事件（不会改变棋盘状态），否则走常规状态更新
+                            if (gameState != null && gameState.has("emojiEvent")) {
+                                try {
+                                    JSONObject evt = gameState.getJSONObject("emojiEvent");
+                                    String sender = evt.optString("sender", null);
+                                    String emoji = evt.optString("emoji", null);
+                                    if (sender != null && emoji != null) {
+                                        handleIncomingEmoji(sender, emoji);
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                updateFromState(gameState);
+                            }
+                        });
             }
 
             @Override
@@ -108,6 +133,145 @@ public class TicTacToeActivity extends AppCompatActivity {
         });
     }
 
+    private void handleIncomingEmoji(String sender, String emoji) {
+        // 将该表情写入游戏对象（本局有效）
+        if (game != null) {
+            if (game instanceof com.example.hakimichat.game.BaseGame) {
+                ((com.example.hakimichat.game.BaseGame) game).setLastEmoji(sender, emoji);
+            }
+        }
+
+        // 如果发送者是玩家，显示在玩家头像附近并在头像左下角显示角标
+        if (game.getPlayers().contains(sender)) {
+            showEmojiNearPlayerAvatar(sender, emoji);
+        } else if (game.getSpectators().contains(sender)) {
+            // 观战者：随机在屏幕左右显示带昵称的气泡
+            showSpectatorBubble(sender, emoji);
+        } else {
+            // 未知身份，仍展示为临时提示（右下）
+            showSpectatorBubble(sender, emoji);
+        }
+    }
+
+    private void showEmojiNearPlayerAvatar(String sender, String emoji) {
+        TextView anchor = null;
+        // 根据玩家顺序映射到头像
+        java.util.List<String> players = game.getPlayers();
+        if (players.size() >= 1 && players.get(0).equals(sender)) {
+            anchor = ivPlayerXAvatar;
+        } else if (players.size() >= 2 && players.get(1).equals(sender)) {
+            anchor = ivPlayerOAvatar;
+        }
+
+        if (anchor == null) return;
+
+    ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+    TextView bubble = new TextView(this);
+    bubble.setText(emoji);
+    bubble.setTextSize(18f);
+    // 使用圆角矩形聊天气泡背景（编程方式），避免使用圆形背景
+    GradientDrawable gd = new GradientDrawable();
+    gd.setColor(Color.parseColor("#FFFFFF"));
+    gd.setCornerRadius(18f);
+    gd.setStroke(1, Color.parseColor("#DDDDDD"));
+    bubble.setBackground(gd);
+    bubble.setPadding(18, 8, 18, 8);
+
+        int[] loc = new int[2];
+        anchor.getLocationOnScreen(loc);
+        int anchorX = loc[0];
+        int anchorY = loc[1];
+
+        // 以 content view 左上为基准，计算偏移
+        int[] rootLoc = new int[2];
+        root.getLocationOnScreen(rootLoc);
+
+        // 测量气泡尺寸，然后将气泡放在头像上方的左右角（左玩家放右上，右玩家放左上）
+        bubble.measure(View.MeasureSpec.makeMeasureSpec(root.getWidth(), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(root.getHeight(), View.MeasureSpec.AT_MOST));
+        int bubbleW = bubble.getMeasuredWidth();
+        int bubbleH = bubble.getMeasuredHeight();
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        // 垂直放在头像上方
+        lp.topMargin = anchorY - rootLoc[1] - bubbleH - 6; // 贴近头像上方
+
+        // 左侧玩家（第一个玩家）放在头像右上角，右侧玩家放在头像左上角
+        if (anchor == ivPlayerOAvatar) {
+            // 右侧玩家：气泡显示在头像左上角
+            lp.leftMargin = anchorX - rootLoc[0] - bubbleW - 6;
+        } else {
+            // 左侧玩家：气泡显示在头像右上角
+            lp.leftMargin = anchorX - rootLoc[0] + anchor.getWidth() + 6;
+        }
+
+        // 边界修正，避免越出屏幕
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        if (lp.leftMargin < 6) lp.leftMargin = 6;
+        if (lp.leftMargin + bubbleW > screenW - 6) lp.leftMargin = screenW - bubbleW - 6;
+
+        // 若超出顶部则下移到头像下方作为兜底
+        if (lp.topMargin < 6) {
+            lp.topMargin = anchorY - rootLoc[1] + anchor.getHeight() + 6;
+        }
+
+        root.addView(bubble, lp);
+
+        // 自动移除
+        bubble.postDelayed(() -> {
+            try { root.removeView(bubble); } catch (Exception ignored) {}
+        }, 2500);
+    }
+
+    private void setAvatarBadge(String sender, String emoji) {
+        // 已取消头像角标（需求变更）
+    }
+
+    private void showSpectatorBubble(String sender, String emoji) {
+        ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+        TextView bubble = new TextView(this);
+        bubble.setText(sender + ": " + emoji);
+        bubble.setTextSize(14f);
+        bubble.setBackgroundResource(com.example.hakimichat.R.drawable.bg_avatar_circle);
+        bubble.setPadding(12, 8, 12, 8);
+
+        java.util.Random rnd = new java.util.Random();
+        boolean left = rnd.nextBoolean();
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+
+        // 计算玩家信息区域底部，确保观众气泡不会出现在玩家信息上方
+        int minY = 100;
+        try {
+            int[] p1 = new int[2];
+            int[] p2 = new int[2];
+            ivPlayerXAvatar.getLocationOnScreen(p1);
+            ivPlayerOAvatar.getLocationOnScreen(p2);
+            int bottom1 = p1[1] + ivPlayerXAvatar.getHeight();
+            int bottom2 = p2[1] + ivPlayerOAvatar.getHeight();
+            int[] rootLoc = new int[2];
+            root.getLocationOnScreen(rootLoc);
+            minY = Math.max(minY, Math.max(bottom1, bottom2) - rootLoc[1] + 8);
+        } catch (Exception ignored) {}
+
+        int maxRange = Math.max(1, screenH - minY - 200);
+        int y = minY + rnd.nextInt(maxRange);
+
+        // 聊天气泡风格：浅灰背景，圆角
+        GradientDrawable gd = new GradientDrawable();
+        gd.setColor(Color.parseColor("#F1F1F1"));
+        gd.setCornerRadius(18f);
+        gd.setStroke(1, Color.parseColor("#E0E0E0"));
+        bubble.setBackground(gd);
+
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    lp.topMargin = y;
+    lp.leftMargin = left ? 8 : getResources().getDisplayMetrics().widthPixels - 220;
+        root.addView(bubble, lp);
+
+        bubble.postDelayed(() -> {
+            try { root.removeView(bubble); } catch (Exception ignored) {}
+        }, 2500);
+    }
+
     private void initViews() {
         tvGameStatus = findViewById(R.id.tvGameStatus);
         tvPlayerX = findViewById(R.id.tvPlayerX);
@@ -117,6 +281,9 @@ public class TicTacToeActivity extends AppCompatActivity {
         tvSpectators = findViewById(R.id.tvSpectators);
         btnRestart = findViewById(R.id.btnRestart);
         btnExit = findViewById(R.id.btnExit);
+        btnEmoji = findViewById(R.id.btnEmoji);
+        // bind the inner palette row so toggling it won't reflow the layout
+        emojiPalette = findViewById(R.id.emojiPaletteInner);
 
         // 初始化棋盘按钮
         buttons[0][0] = findViewById(R.id.btn_00);
@@ -169,6 +336,58 @@ public class TicTacToeActivity extends AppCompatActivity {
 
         // 退出按钮
         btnExit.setOnClickListener(v -> finish());
+
+        // 表情按钮：切换面板显示
+        if (btnEmoji != null) {
+            btnEmoji.setOnClickListener(v -> {
+                if (emojiPalette != null) {
+                    emojiPalette.setVisibility(emojiPalette.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                }
+            });
+        }
+
+        // 表情面板按钮绑定（12 个）
+        bindEmojiClick(R.id.emoji_1);
+        bindEmojiClick(R.id.emoji_2);
+        bindEmojiClick(R.id.emoji_3);
+        bindEmojiClick(R.id.emoji_4);
+        bindEmojiClick(R.id.emoji_5);
+        bindEmojiClick(R.id.emoji_6);
+        bindEmojiClick(R.id.emoji_7);
+        bindEmojiClick(R.id.emoji_8);
+        bindEmojiClick(R.id.emoji_9);
+        bindEmojiClick(R.id.emoji_10);
+        bindEmojiClick(R.id.emoji_11);
+        bindEmojiClick(R.id.emoji_12);
+    }
+
+    private void bindEmojiClick(int resId) {
+        try {
+            View v = findViewById(resId);
+            if (v instanceof TextView) {
+                ((TextView) v).setOnClickListener(view -> {
+                    String emoji = ((TextView) view).getText().toString();
+                    sendEmoji(emoji);
+                });
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void sendEmoji(String emoji) {
+        // 仅允许玩家或观战者发送
+        boolean isPlayer = game.getPlayers().contains(username);
+        boolean isSpec = game.getSpectators().contains(username);
+            if (!isPlayer && !isSpec) {
+                showToast("只有玩家或观战者可以发送表情");
+                if (emojiPalette != null) emojiPalette.setVisibility(View.GONE);
+                return;
+            }
+
+        gameManager.sendGameEmoji(gameId, username, emoji);
+        // 立刻隐藏面板并提示已发送（UI 气泡在下一步实现）
+    if (emojiPalette != null) emojiPalette.setVisibility(View.GONE);
+            // 已取消发送后的弹窗提示，UI 会显示气泡
     }
 
     private void onCellClick(int row, int col) {
@@ -482,6 +701,12 @@ public class TicTacToeActivity extends AppCompatActivity {
                 }
             }
         }
+
+        // 更新 moveCount 跟踪（可用于后续逻辑）
+        try {
+            int moveCount = state.optInt("moveCount", -1);
+            prevMoveCount = moveCount;
+        } catch (Exception ignored) {}
     }
 
     private void showToast(String message) {

@@ -8,6 +8,11 @@ import android.os.Looper;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.Color;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -29,6 +34,9 @@ public class GobangActivity extends AppCompatActivity {
     private TextView tvGameStatus, tvBlackPlayer, tvWhitePlayer, tvSpectators;
     private TextView ivBlackAvatar, ivWhiteAvatar;
     private Button btnUndo, btnRestart, btnExit;
+    private Button btnEmoji;
+    private View emojiPalette;
+    private int prevMoveCount = -1;
 
     private String gameId;
     private String username;
@@ -82,7 +90,22 @@ public class GobangActivity extends AppCompatActivity {
         gameManager.setGameStateListener(gameId, new GameManager.GameStateListener() {
             @Override
             public void onGameStateChanged(String gameId, JSONObject gameState) {
-                mainHandler.post(() -> updateFromState(gameState));
+                        mainHandler.post(() -> {
+                            if (gameState != null && gameState.has("emojiEvent")) {
+                                try {
+                                    JSONObject evt = gameState.getJSONObject("emojiEvent");
+                                    String sender = evt.optString("sender", null);
+                                    String emoji = evt.optString("emoji", null);
+                                    if (sender != null && emoji != null) {
+                                        handleIncomingEmoji(sender, emoji);
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                updateFromState(gameState);
+                            }
+                        });
             }
 
             @Override
@@ -111,6 +134,125 @@ public class GobangActivity extends AppCompatActivity {
         });
     }
 
+    private void handleIncomingEmoji(String sender, String emoji) {
+        if (game != null) {
+            if (game instanceof com.example.hakimichat.game.BaseGame) {
+                ((com.example.hakimichat.game.BaseGame) game).setLastEmoji(sender, emoji);
+            }
+        }
+
+        // 如果发送者是玩家，显示在玩家头像附近并设置角标
+        String black = game.getBlackPlayerName();
+        String white = game.getWhitePlayerName();
+        if (sender != null && (sender.equals(black) || sender.equals(white))) {
+            showEmojiNearPlayerAvatar(sender, emoji);
+        } else if (game.getSpectators().contains(sender)) {
+            showSpectatorBubble(sender, emoji);
+        } else {
+            showSpectatorBubble(sender, emoji);
+        }
+    }
+
+    private void showEmojiNearPlayerAvatar(String sender, String emoji) {
+        TextView anchor = null;
+        String black = game.getBlackPlayerName();
+        String white = game.getWhitePlayerName();
+        if (sender != null && sender.equals(black)) anchor = ivBlackAvatar;
+        else if (sender != null && sender.equals(white)) anchor = ivWhiteAvatar;
+        if (anchor == null) return;
+
+    ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+    TextView bubble = new TextView(this);
+    bubble.setText(emoji);
+    bubble.setTextSize(18f);
+    GradientDrawable gd = new GradientDrawable();
+    gd.setColor(Color.parseColor("#FFFFFF"));
+    gd.setCornerRadius(18f);
+    gd.setStroke(1, Color.parseColor("#DDDDDD"));
+    bubble.setBackground(gd);
+    bubble.setPadding(18, 8, 18, 8);
+
+        int[] loc = new int[2];
+        anchor.getLocationOnScreen(loc);
+        int[] rootLoc = new int[2];
+        root.getLocationOnScreen(rootLoc);
+
+        // 测量气泡并放置在头像上方的左右角（左玩家放右上，右玩家放左上）
+        bubble.measure(View.MeasureSpec.makeMeasureSpec(root.getWidth(), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(root.getHeight(), View.MeasureSpec.AT_MOST));
+        int bubbleW = bubble.getMeasuredWidth();
+        int bubbleH = bubble.getMeasuredHeight();
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        // 垂直放在头像上方
+        lp.topMargin = loc[1] - rootLoc[1] - bubbleH - 6;
+
+        // 如果是右侧玩家（白方），气泡放在头像左上角；否则放右上角
+        if (anchor == ivWhiteAvatar) {
+            lp.leftMargin = loc[0] - rootLoc[0] - bubbleW - 6;
+        } else {
+            lp.leftMargin = loc[0] - rootLoc[0] + anchor.getWidth() + 6;
+        }
+
+        // 边界修正
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        if (lp.leftMargin < 6) lp.leftMargin = 6;
+        if (lp.leftMargin + bubbleW > screenW - 6) lp.leftMargin = screenW - bubbleW - 6;
+
+        if (lp.topMargin < 6) {
+            lp.topMargin = loc[1] - rootLoc[1] + anchor.getHeight() + 6; // 兜底到头像下方
+        }
+
+        root.addView(bubble, lp);
+        bubble.postDelayed(() -> { try { root.removeView(bubble); } catch (Exception ignored) {} }, 2500);
+    }
+
+    private void setAvatarBadge(String sender, String emoji) {
+        // 已取消头像角标（需求变更）
+    }
+
+    private void showSpectatorBubble(String sender, String emoji) {
+        ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+        TextView bubble = new TextView(this);
+        bubble.setText(sender + ": " + emoji);
+        bubble.setTextSize(14f);
+        bubble.setBackgroundResource(com.example.hakimichat.R.drawable.bg_avatar_circle);
+        bubble.setPadding(12, 8, 12, 8);
+
+        java.util.Random rnd = new java.util.Random();
+        boolean left = rnd.nextBoolean();
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+
+        // 计算玩家信息底部，保证观战气泡不会遮挡玩家区域
+        int minY = 100;
+        try {
+            int[] p1 = new int[2];
+            int[] p2 = new int[2];
+            ivBlackAvatar.getLocationOnScreen(p1);
+            ivWhiteAvatar.getLocationOnScreen(p2);
+            int bottom1 = p1[1] + ivBlackAvatar.getHeight();
+            int bottom2 = p2[1] + ivWhiteAvatar.getHeight();
+            int[] rootLoc = new int[2];
+            root.getLocationOnScreen(rootLoc);
+            minY = Math.max(minY, Math.max(bottom1, bottom2) - rootLoc[1] + 8);
+        } catch (Exception ignored) {}
+
+        int maxRange = Math.max(1, screenH - minY - 200);
+        int y = minY + rnd.nextInt(maxRange);
+
+        // 聊天气泡风格：浅灰背景，圆角
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#F1F1F1"));
+        bg.setCornerRadius(18f);
+        bg.setStroke(1, Color.parseColor("#E0E0E0"));
+        bubble.setBackground(bg);
+
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    lp.topMargin = y;
+    lp.leftMargin = left ? 8 : getResources().getDisplayMetrics().widthPixels - 220;
+    root.addView(bubble, lp);
+        bubble.postDelayed(() -> { try { root.removeView(bubble); } catch (Exception ignored) {} }, 2500);
+    }
+
     private void initViews() {
         boardView = findViewById(R.id.gobangBoard);
         tvGameStatus = findViewById(R.id.tvGameStatus);
@@ -122,6 +264,9 @@ public class GobangActivity extends AppCompatActivity {
         btnUndo = findViewById(R.id.btnUndo);
         btnRestart = findViewById(R.id.btnRestart);
         btnExit = findViewById(R.id.btnExit);
+    btnEmoji = findViewById(R.id.btnEmoji);
+    // bind inner palette row so toggling doesn't reflow layout
+    emojiPalette = findViewById(R.id.emojiPaletteInner);
     }
 
     // 头像由布局中的 TextView 展示，这里不再生成 Bitmap
@@ -171,6 +316,57 @@ public class GobangActivity extends AppCompatActivity {
 
         // 退出按钮
         btnExit.setOnClickListener(v -> finish());
+
+        // 表情按钮：切换面板显示
+        if (btnEmoji != null) {
+            btnEmoji.setOnClickListener(v -> {
+                if (emojiPalette != null) {
+                    emojiPalette.setVisibility(emojiPalette.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                }
+            });
+        }
+
+        // 绑定表情面板按钮
+        bindEmojiClick(R.id.emoji_1);
+        bindEmojiClick(R.id.emoji_2);
+        bindEmojiClick(R.id.emoji_3);
+        bindEmojiClick(R.id.emoji_4);
+        bindEmojiClick(R.id.emoji_5);
+        bindEmojiClick(R.id.emoji_6);
+        bindEmojiClick(R.id.emoji_7);
+        bindEmojiClick(R.id.emoji_8);
+        bindEmojiClick(R.id.emoji_9);
+        bindEmojiClick(R.id.emoji_10);
+        bindEmojiClick(R.id.emoji_11);
+        bindEmojiClick(R.id.emoji_12);
+    }
+
+    private void bindEmojiClick(int resId) {
+        try {
+            View v = findViewById(resId);
+            if (v instanceof TextView) {
+                ((TextView) v).setOnClickListener(view -> {
+                    String emoji = ((TextView) view).getText().toString();
+                    sendEmoji(emoji);
+                });
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void sendEmoji(String emoji) {
+        // 仅允许玩家或观战者发送
+        boolean isPlayer = game.getPlayers().contains(username);
+        boolean isSpec = game.getSpectators().contains(username);
+        if (!isPlayer && !isSpec) {
+            showToast("只有玩家或观战者可以发送表情");
+            if (emojiPalette != null) emojiPalette.setVisibility(View.GONE);
+            return;
+        }
+
+        gameManager.sendGameEmoji(gameId, username, emoji);
+    if (emojiPalette != null) emojiPalette.setVisibility(View.GONE);
+        // 取消发送后的吐司提示，使用气泡显示反馈
     }
 
     private void onCellClick(int x, int y) {
@@ -374,6 +570,12 @@ public class GobangActivity extends AppCompatActivity {
                 }
             }
         }
+
+        // 更新 moveCount 跟踪（可用于后续逻辑）
+        try {
+            int moveCount = state.optInt("moveCount", -1);
+            prevMoveCount = moveCount;
+        } catch (Exception ignored) {}
     }
 
     private void showToast(String message) {

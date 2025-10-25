@@ -10,7 +10,7 @@ public class AppConstants {
     /**
      * 昵称最大长度（字符数）
      */
-    public static final int MAX_NICKNAME_LENGTH = 10;
+    public static final int MAX_NICKNAME_LENGTH = 5;
     
     /**
      * 昵称最小长度（字符数）
