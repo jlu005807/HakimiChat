@@ -7,72 +7,112 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- 游戏信息头部 -->
+    <!-- 标题与状态（靠上） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:background="@color/cardBackground"
-        android:elevation="4dp"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:gravity="center_horizontal"
+        android:layout_marginBottom="6dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
 
         <TextView
             android:id="@+id/tvGameTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
             android:text="国际象棋对战"
             android:textColor="@color/textPrimary"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvGameStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:text="等待玩家加入..."
             android:textColor="@color/textSecondary"
-            android:textSize="16sp" />
+            android:textSize="17sp" />
+    </LinearLayout>
+
+    <!-- 玩家信息卡片：左右两侧带头像 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/cardBackground"
+        android:paddingTop="12dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:elevation="4dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
 
-            <TextView
-                android:id="@+id/tvWhitePlayer"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:gravity="center"
-                android:text="白方: "
-                android:textColor="@color/textPrimary"
-                android:textSize="14sp" />
+                android:orientation="horizontal"
+                android:gravity="start|center_vertical">
 
-            <TextView
-                android:id="@+id/tvBlackPlayer"
+                <TextView
+                    android:id="@+id/ivWhiteAvatar"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_avatar_circle"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:padding="0dp" />
+
+                <TextView
+                    android:id="@+id/tvWhitePlayer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="白方: "
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:gravity="center"
-                android:text="黑方: "
-                android:textColor="@color/textPrimary"
-                android:textSize="14sp" />
+                android:orientation="horizontal"
+                android:gravity="end|center_vertical">
+
+                <TextView
+                    android:id="@+id/tvBlackPlayer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="黑方: "
+                    android:textSize="14sp"
+                    android:textColor="@color/textPrimary" />
+
+                <TextView
+                    android:id="@+id/ivBlackAvatar"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_avatar_circle"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:padding="0dp" />
+            </LinearLayout>
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvSpectators"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="8dp"
-            android:text="观战者: "
-            android:textColor="@color/textTertiary"
-            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- 棋盘 -->
@@ -82,6 +122,17 @@
         android:layout_height="0dp"
         android:layout_marginBottom="16dp"
         android:layout_weight="1" />
+
+    <!-- 观战者列表：放在棋盘下方、按钮上方，与其他布局一致 -->
+    <TextView
+        android:id="@+id/tvSpectators"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="观战者: "
+        android:textColor="@color/textSecondary"
+        android:textSize="14sp"
+        android:visibility="gone" />
 
     <!-- 按钮区域 -->
     <LinearLayout
