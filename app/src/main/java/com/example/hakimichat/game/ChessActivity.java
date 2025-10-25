@@ -24,6 +24,7 @@ public class ChessActivity extends AppCompatActivity {
 
     private ChessBoardView boardView;
     private TextView tvGameStatus, tvWhitePlayer, tvBlackPlayer, tvSpectators;
+    private TextView ivWhiteAvatar, ivBlackAvatar;
     private Button btnUndo, btnRestart, btnExit;
 
     private String gameId;
@@ -111,6 +112,8 @@ public class ChessActivity extends AppCompatActivity {
         tvGameStatus = findViewById(R.id.tvGameStatus);
         tvWhitePlayer = findViewById(R.id.tvWhitePlayer);
         tvBlackPlayer = findViewById(R.id.tvBlackPlayer);
+        ivWhiteAvatar = findViewById(R.id.ivWhiteAvatar);
+        ivBlackAvatar = findViewById(R.id.ivBlackAvatar);
         tvSpectators = findViewById(R.id.tvSpectators);
         btnUndo = findViewById(R.id.btnUndo);
         btnRestart = findViewById(R.id.btnRestart);
@@ -255,11 +258,35 @@ public class ChessActivity extends AppCompatActivity {
         tvWhitePlayer.setText("白方: " + (game.getWhitePlayerName() != null ? game.getWhitePlayerName() : "等待中"));
         tvBlackPlayer.setText("黑方: " + (game.getBlackPlayerName() != null ? game.getBlackPlayerName() : "等待中"));
 
-        // 更新观战者信息
+        // 设置头像文字（显示昵称首字或"电"表示电脑），与其他游戏 Activity 保持一致
+        try {
+            String whitePlayer = game.getWhitePlayerName();
+            String blackPlayer = game.getBlackPlayerName();
+
+            if (whitePlayer != null) {
+                String display = whitePlayer.startsWith("电脑") ? "电" : (whitePlayer.isEmpty() ? "?" : String.valueOf(whitePlayer.charAt(0)));
+                ivWhiteAvatar.setText(display);
+            } else {
+                ivWhiteAvatar.setText("");
+            }
+
+            if (blackPlayer != null) {
+                String display = blackPlayer.startsWith("电脑") ? "电" : (blackPlayer.isEmpty() ? "?" : String.valueOf(blackPlayer.charAt(0)));
+                ivBlackAvatar.setText(display);
+            } else {
+                ivBlackAvatar.setText("");
+            }
+        } catch (Exception ignore) {
+            // ignore avatar rendering issues
+        }
+
+        // 更新观战者信息（有观战者则显示，否则隐藏）
         java.util.List<String> spectators = game.getSpectators();
         if (spectators.isEmpty()) {
+            tvSpectators.setVisibility(TextView.GONE);
             tvSpectators.setText("观战者: 无");
         } else {
+            tvSpectators.setVisibility(TextView.VISIBLE);
             tvSpectators.setText("观战者: " + android.text.TextUtils.join(", ", spectators));
         }
 
