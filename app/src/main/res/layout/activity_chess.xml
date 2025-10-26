@@ -175,4 +175,54 @@
             android:textColor="@android:color/white"
             android:textSize="14sp" />
     </LinearLayout>
+
+        <!-- 表情按钮（与五子棋一致的发表情功能） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="8dp">
+
+            <Button
+                android:id="@+id/btnEmoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="😊"
+                android:textSize="20sp"
+                android:padding="8dp" />
+
+        </LinearLayout>
+
+        <!-- 表情面板外壳：固定高度以保留空间，内部实际按钮行通过 id 控制可见性 -->
+        <LinearLayout
+            android:id="@+id/emojiPalette"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:visibility="visible"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                android:id="@+id/emojiPaletteInner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:visibility="gone">
+                <TextView android:id="@+id/emoji_1" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😀" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_2" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😂" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_3" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😍" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_4" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😮" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_5" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😢" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_6" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😡" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_7" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="👍" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_8" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="👏" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_9" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="😎" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_10" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="🤝" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_11" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="🎉" android:textSize="20sp" android:padding="6dp" />
+                <TextView android:id="@+id/emoji_12" android:layout_width="40dp" android:layout_height="40dp" android:gravity="center" android:text="💡" android:textSize="20sp" android:padding="6dp" />
+            </LinearLayout>
+
+        </LinearLayout>
 </LinearLayout>
