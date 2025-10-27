@@ -34,7 +34,7 @@
                     android:id="@+id/ivGameIcon"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:src="@drawable/ic_tictactoe"
+                    android:src="@drawable/ic_game"
                     android:contentDescription="游戏图标" />
 
                 <LinearLayout
@@ -49,7 +49,7 @@
                         android:id="@+id/tvGameName"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="井字棋"
+                        android:text="游戏"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:textColor="@android:color/black" />

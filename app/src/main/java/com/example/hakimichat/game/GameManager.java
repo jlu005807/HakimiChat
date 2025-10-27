@@ -278,6 +278,21 @@ public class GameManager {
             
             // 广播游戏状态给其他人
             broadcastGameState(gameId);
+        } else if (game != null) {
+            // 无法加入（例如已满），将该用户设为观战者并让其看到当前棋局
+            game.addSpectator(player);
+
+            // 立即广播当前游戏状态（包括更新后的观战者列表），让新观战者能够看到棋局
+            broadcastGameState(gameId);
+
+            // 通知本地监听器更新界面（观战者列表）
+            GameStateListener listener = gameStateListeners.get(gameId);
+            if (listener != null) {
+                listener.onGameStateChanged(gameId, game.getGameState());
+            }
+
+            // 游戏卡片人数不计入观战者，这里仍然通知以保证卡片同步（可选）
+            notifyGameCardUpdate(gameId);
         }
     }
     
@@ -384,9 +399,17 @@ public class GameManager {
      */
     public void sendGameEmoji(String gameId, String sender, String emoji) {
         Message emojiMsg = Message.createGameEmojiMessage(sender, gameId, emoji);
-        sendMessage(emojiMsg);
-        // 立即本地处理，room 的消息接收路径不会分发回发送者
-        handleGameEmoji(emojiMsg);
+        // 如果当前是房主，使用房主端的广播逻辑把表情只转发给该局的玩家和观战者
+        if (isHost && serverManager != null) {
+            // 先本地处理
+            handleGameEmoji(emojiMsg);
+            // 房主会在 handleGameEmoji 中调用 serverManager 转发给相关用户
+        } else {
+            // 客户端发送给房主，房主收到后会转发给该局参与者
+            sendMessage(emojiMsg);
+            // 立即本地处理发送者自己的显示（房间消息接收路径通常不会把发送者的消息再发回）
+            handleGameEmoji(emojiMsg);
+        }
     }
 
     /**
@@ -419,6 +442,24 @@ public class GameManager {
             GameStateListener listener = gameStateListeners.get(gameId);
             if (listener != null) {
                 listener.onGameStateChanged(gameId, evt);
+            }
+            // 如果当前是房主，将该表情通过房主转发给本局的所有玩家和观战者（不包含发送者自己）
+            if (isHost && serverManager != null) {
+                try {
+                    Game g = activeGames.get(gameId);
+                    if (g != null) {
+                        java.util.List<String> recipients = new java.util.ArrayList<>();
+                        if (g.getPlayers() != null) recipients.addAll(g.getPlayers());
+                        if (g.getSpectators() != null) recipients.addAll(g.getSpectators());
+                        // 移除发送者自己（发送端已经本地显示）
+                        recipients.remove(sender);
+                        if (!recipients.isEmpty()) {
+                            serverManager.broadcastMessageToUsers(recipients, message);
+                        }
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();

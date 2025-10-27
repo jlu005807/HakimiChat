@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 配置启动动画可选的音乐资源（放到 res/raw 下），填写资源名（不带后缀）例如: "welcome1" "theme2" -->
+    <string-array name="splash_music">
+        <item>bu_zai</item>
+        <item>lan_lian_ha</item>
+        <item>she_jian</item>
+        <item>tiao_lou_ji</item>
+    </string-array>
+</resources>

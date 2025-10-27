@@ -286,6 +286,25 @@ public class ServerManager {
         });
     }
 
+    /**
+     * 将消息发送给指定昵称列表中的客户端（仅这些客户端会收到）
+     */
+    public void broadcastMessageToUsers(java.util.List<String> nicknames, Message message) {
+        if (nicknames == null || nicknames.isEmpty()) return;
+        Log.d(TAG, "Broadcasting message to specific users: " + nicknames.toString());
+        executorService.execute(() -> {
+            for (ClientHandler client : clients) {
+                try {
+                    if (client.clientNickname != null && nicknames.contains(client.clientNickname)) {
+                        client.sendMessage(message);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error sending message to specific client", e);
+                }
+            }
+        });
+    }
+
     public void stopServer() {
         isRunning = false;
         try {
@@ -374,15 +393,15 @@ public class ServerManager {
                     }
                     // 转发给所有其他客户端
                     // 普通消息、游戏相关消息都需要转发
-                    if (message.getMessageType() == Message.TYPE_NORMAL ||
-                        message.getMessageType() == Message.TYPE_GAME_INVITE ||
-                        message.getMessageType() == Message.TYPE_GAME_JOIN ||
-                        message.getMessageType() == Message.TYPE_GAME_MOVE ||
-                        message.getMessageType() == Message.TYPE_GAME_STATE ||
-                        message.getMessageType() == Message.TYPE_GAME_END ||
-                        message.getMessageType() == Message.TYPE_GAME_QUIT ||
-                        message.getMessageType() == Message.TYPE_GAME_SPECTATE ||
-                        message.getMessageType() == Message.TYPE_GAME_RESTART) {
+                        if (message.getMessageType() == Message.TYPE_NORMAL ||
+                            message.getMessageType() == Message.TYPE_GAME_INVITE ||
+                            message.getMessageType() == Message.TYPE_GAME_JOIN ||
+                            message.getMessageType() == Message.TYPE_GAME_MOVE ||
+                            message.getMessageType() == Message.TYPE_GAME_STATE ||
+                            message.getMessageType() == Message.TYPE_GAME_END ||
+                            message.getMessageType() == Message.TYPE_GAME_QUIT ||
+                            message.getMessageType() == Message.TYPE_GAME_SPECTATE ||
+                            message.getMessageType() == Message.TYPE_GAME_RESTART) {
                         
                         // 将客户端的消息保存到历史记录（只保存普通消息）
                         if (message.getMessageType() == Message.TYPE_NORMAL) {

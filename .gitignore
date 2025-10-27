@@ -32,8 +32,8 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-*.apk
 output.json
+*debug.apk
 
 # IntelliJ
 *.iml

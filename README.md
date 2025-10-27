@@ -93,6 +93,11 @@
 4. 等待对方加入或开始游戏
 5. 其他成员可以选择观战
 
+### 入场动画
+- Splash 入场动画：由 `SplashActivity` 显示，背景使用 `res/drawable/startground.png`，中间播放 `res/drawable/icon.gif`（通过自定义 `GifView` 播放）。
+- 随机背景音乐：从 `res/raw/` 中随机选取一首播放，使用全局单例 `MusicPlayer` 播放，音乐会在 Splash 结束后继续播放直至自然结束（或显式停止）。
+- 可配置项：默认动画最短时长保存在 `res/values/integers.xml`（`splash_duration_ms`），音乐资源在 `res/values/arrays.xml` 的 `splash_music` 中配置。
+
 ## 🛠️ 技术栈
 
 - **开发语言**：Java
