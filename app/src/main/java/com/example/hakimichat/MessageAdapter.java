@@ -240,16 +240,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             }
             tvGameName.setText(gameName);
 
-            // 设置游戏图标：根据 gameType 映射到对应游戏的 icon
-            int iconRes = com.example.hakimichat.R.drawable.ic_tictactoe; // 默认图标
-            if (gameType != null) {
-                if ("TicTacToe".equals(gameType)) {
-                    iconRes = new com.example.hakimichat.game.TicTacToeGame().getGameIcon();
-                } else if ("Gobang".equals(gameType)) {
-                    iconRes = new com.example.hakimichat.game.GobangGame().getGameIcon();
-                }
-            }
-            ivGameIcon.setImageResource(iconRes);
+            // 注意：上面已根据 gameType 设置了 ivGameIcon；不需要在此处再次覆盖
             
             // 设置发起人信息
             String senderText = message.getSender() + " 发起了游戏";
